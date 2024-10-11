@@ -19,19 +19,26 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/library-go/pkg/features"
+	capimachine "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	//+kubebuilder:scaffold:imports
+
+	"github.com/appuio/machine-api-provider-cloudscale/pkg/machine"
 )
 
 var (
@@ -41,6 +48,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
+	utilruntime.Must(machinev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -56,17 +65,30 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	var watchNamespace string
+	flag.StringVar(&watchNamespace, "namespace", "", "Namespace that the controller watches to reconcile machine-api objects. If unspecified, the controller watches for machine-api objects across all namespaces.")
+
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
+
+	// TODO(bastjan): Check what those flags do. They are required since release-4.18
+	featureGate := feature.DefaultMutableFeatureGate
+	gateOpts, err := features.NewFeatureGateOptions(featureGate, apifeatures.SelfManaged, apifeatures.FeatureGateMachineAPIMigration)
+	if err != nil {
+		setupLog.Error(err, "Error setting up feature gates")
+	}
+	gateOpts.AddFlagsToGoFlagSet(nil)
+
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	switch target {
 	case "manager":
-		runManager(metricsAddr, probeAddr, enableLeaderElection)
+		runManager(metricsAddr, probeAddr, watchNamespace, enableLeaderElection, featureGate)
 	case "termination-handler":
 		runTerminationHandler()
 	default:
@@ -75,8 +97,8 @@ func main() {
 	}
 }
 
-func runManager(metricsAddr, probeAddr string, enableLeaderElection bool) {
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElection bool, featureGate featuregate.MutableVersionedFeatureGate) {
+	opts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress: metricsAddr,
@@ -95,9 +117,31 @@ func runManager(metricsAddr, probeAddr string, enableLeaderElection bool) {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
-	})
+
+		Cache: cache.Options{
+			// Override the default 10 hour sync period so that we pick up external changes
+			// to the VMs within a reasonable time frame.
+			SyncPeriod: ptr.To(10 * time.Minute),
+		},
+	}
+
+	if watchNamespace != "" {
+		opts.Cache.DefaultNamespaces = map[string]cache.Config{
+			watchNamespace: {},
+		}
+		setupLog.Info("Watching machine-api objects only given namespace for reconciliation.", "namespace", watchNamespace)
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), opts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	machineActuator := machine.NewActuator(machine.ActuatorParams{})
+
+	if err := capimachine.AddWithActuator(mgr, machineActuator, featureGate); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Machine")
 		os.Exit(1)
 	}
 

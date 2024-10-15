@@ -40,7 +40,7 @@ type CloudscaleMachineProviderSpec struct {
 	// https://www.cloudscale.ch/en/api/v1#images
 	Image string `json:"image"`
 	// RootVolumeSizeGB is the size of the root volume in GB.
-	RootVolumeSizeGB int `json:"volumeSizeGB"`
+	RootVolumeSizeGB int `json:"rootVolumeSizeGB"`
 	// SSHKeys is a list of SSH keys to add to the machine.
 	SSHKeys []string `json:"sshKeys"`
 	// UserData is the user data to pass to the machine.

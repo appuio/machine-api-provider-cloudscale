@@ -1,0 +1,24 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  annotations: {}
+  name: app-1
+  labels:
+    machine.openshift.io/cluster-api-cluster: cluster-1
+spec:
+  lifecycleHooks: {}
+  metadata:
+    labels:
+      node-role.kubernetes.io/app: ""
+      node-role.kubernetes.io/worker: ""
+  providerSpec:
+    value:
+      zone: lpg1
+      flavor: flex-4-1
+      image: debian-12
+      rootVolumeSizeGB: 50
+      sshKeys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII/HGW/GXvDRliE36QJJgYigs7+UfJFf/fkLotIDOl8z sebastian.widmer@vshn.net
+      interfaces:
+      - type: Public
+status: {}

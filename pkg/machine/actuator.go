@@ -148,6 +148,15 @@ func (a *Actuator) patchMachine(ctx context.Context, orig, updated *machinev1bet
 }
 
 func updateMachineFromCloudscaleServer(machine *machinev1beta1.Machine, s cloudscale.Server) error {
+	if machine.Labels == nil {
+		machine.Labels = make(map[string]string)
+	}
+	machine.Labels[machinecontroller.MachineInstanceTypeLabelName] = s.Flavor.Slug
+	machine.Labels[machinecontroller.MachineRegionLabelName] = strings.TrimRightFunc(s.Zone.Slug, func(r rune) bool {
+		return r >= '0' && r <= '9'
+	})
+	machine.Labels[machinecontroller.MachineAZLabelName] = s.Zone.Slug
+
 	machine.Spec.ProviderID = ptr.To(formatProviderID(s.UUID))
 	machine.Status.Addresses = machineAddressesFromCloudscaleServer(s)
 	status := providerStatusFromCloudscaleServer(s)

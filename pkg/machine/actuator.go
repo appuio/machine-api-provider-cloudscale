@@ -2,10 +2,13 @@ package machine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/utils/ptr"
@@ -45,7 +48,12 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to get provider spec from machine %q: %w", machine.Name, err)
 	}
 
-	s, err := a.ServerClient.Create(ctx, &cloudscale.ServerRequest{
+	// Null is not allowed for tags in the cloudscale API
+	if spec.Tags == nil {
+		spec.Tags = make(map[string]string)
+	}
+
+	req := &cloudscale.ServerRequest{
 		Name: machine.Name,
 
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
@@ -56,19 +64,19 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 			Zone: spec.Zone,
 		},
 
-		Flavor:            spec.Flavor,
-		Image:             spec.Image,
-		VolumeSizeGB:      spec.RootVolumeSizeGB,
-		Interfaces:        cloudscaleServerInterfacesFromProviderSpecInterfaces(spec.Interfaces),
-		SSHKeys:           spec.SSHKeys,
-		UsePublicNetwork:  ptr.To(false),
-		UsePrivateNetwork: ptr.To(false),
-		UseIPV6:           spec.UseIPV6,
-		ServerGroups:      spec.ServerGroups,
-		UserData:          spec.UserData,
-	})
+		Flavor:       spec.Flavor,
+		Image:        spec.Image,
+		VolumeSizeGB: spec.RootVolumeSizeGB,
+		Interfaces:   cloudscaleServerInterfacesFromProviderSpecInterfaces(spec.Interfaces),
+		SSHKeys:      spec.SSHKeys,
+		UseIPV6:      spec.UseIPV6,
+		ServerGroups: spec.ServerGroups,
+		UserData:     spec.UserData,
+	}
+	s, err := a.ServerClient.Create(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to create machine %q: %w", machine.Name, err)
+		reqRaw, _ := json.Marshal(req)
+		return fmt.Errorf("failed to create machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
 	}
 
 	l.Info("Created machine", "machine", machine.Name, "uuid", s.UUID, "server", s)
@@ -110,7 +118,23 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 }
 
 func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) error {
-	return fmt.Errorf("not implemented")
+	l := log.FromContext(ctx).WithName("Actuator.Delete")
+
+	s, err := a.getServer(ctx, machine)
+	if err != nil {
+		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
+	}
+
+	if s == nil {
+		l.Info("Machine to delete not found, skipping", "machine", machine.Name)
+		return nil
+	}
+
+	if err := a.ServerClient.Delete(ctx, s.UUID); err != nil {
+		return fmt.Errorf("failed to delete server %q: %w", machine.Name, err)
+	}
+
+	return nil
 }
 
 func (a *Actuator) getServer(ctx context.Context, machine *machinev1beta1.Machine) (*cloudscale.Server, error) {

@@ -18,9 +18,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"runtime/debug"
 	"time"
 
+	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -138,7 +141,19 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 		os.Exit(1)
 	}
 
-	machineActuator := machine.NewActuator(machine.ActuatorParams{})
+	versionString := "unknown"
+	if v, ok := debug.ReadBuildInfo(); ok {
+		versionString = fmt.Sprintf("%s (%s)", v.Main.Version, v.GoVersion)
+	}
+
+	cs := cloudscale.NewClient(nil)
+	cs.UserAgent = "machine-api-provider-cloudscale.appuio.io/" + versionString
+	cs.AuthToken = os.Getenv("CLOUDSCALE_API_TOKEN")
+
+	machineActuator := machine.NewActuator(machine.ActuatorParams{
+		K8sClient:    mgr.GetClient(),
+		ServerClient: cs.Servers,
+	})
 
 	if err := capimachine.AddWithActuator(mgr, machineActuator, featureGate); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Machine")

@@ -27,6 +27,7 @@ build: generate fmt vet $(BIN_FILENAME) ## Build manager binary
 .PHONY: generate
 generate: ## Generate e.g. CRD, RBAC etc.
 	go generate ./...
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen object paths="./..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code

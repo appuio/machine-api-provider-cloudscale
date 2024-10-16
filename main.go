@@ -145,14 +145,19 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 	if v, ok := debug.ReadBuildInfo(); ok {
 		versionString = fmt.Sprintf("%s (%s)", v.Main.Version, v.GoVersion)
 	}
-
-	cs := cloudscale.NewClient(nil)
-	cs.UserAgent = "machine-api-provider-cloudscale.appuio.io/" + versionString
-	cs.AuthToken = os.Getenv("CLOUDSCALE_API_TOKEN")
+	userAgent := "machine-api-provider-cloudscale.appuio.io/" + versionString
 
 	machineActuator := machine.NewActuator(machine.ActuatorParams{
-		K8sClient:    mgr.GetClient(),
-		ServerClient: cs.Servers,
+		K8sClient: mgr.GetClient(),
+
+		DefaultCloudscaleAPIToken: os.Getenv("CLOUDSCALE_API_TOKEN"),
+
+		ServerClientFactory: func(token string) cloudscale.ServerService {
+			cs := cloudscale.NewClient(nil)
+			cs.UserAgent = userAgent
+			cs.AuthToken = token
+			return cs.Servers
+		},
 	})
 
 	if err := capimachine.AddWithActuator(mgr, machineActuator, featureGate); err != nil {

@@ -5,7 +5,8 @@
 package v1beta1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,6 +30,16 @@ func (in *CloudscaleMachineProviderSpec) DeepCopyInto(out *CloudscaleMachineProv
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.UserDataSecret != nil {
+		in, out := &in.UserDataSecret, &out.UserDataSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
+	if in.TokenSecret != nil {
+		in, out := &in.TokenSecret, &out.TokenSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
 	if in.ServerGroups != nil {
 		in, out := &in.ServerGroups, &out.ServerGroups
 		*out = make([]string, len(*in))
@@ -84,7 +95,7 @@ func (in *CloudscaleMachineProviderStatus) DeepCopyInto(out *CloudscaleMachinePr
 	out.TypeMeta = in.TypeMeta
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]v1.Condition, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -1,6 +1,7 @@
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,6 +24,16 @@ type CloudscaleMachineProviderSpec struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// UserDataSecret is a reference to a secret that contains the UserData to apply to the instance.
+	// The secret must contain a key named userData.
+	// +optional
+	UserDataSecret *corev1.LocalObjectReference `json:"userDataSecret,omitempty"`
+	// TokenSecret is a reference to the secret with the Cloudscale API token.
+	// The secret must contain a key named token.
+	// If not token is provided, the operator will try to use the default token from CLOUDSCALE_API_TOKEN.
+	// +optional
+	TokenSecret *corev1.LocalObjectReference `json:"tokenSecret,omitempty"`
+
 	// Zone is the zone in which the machine will be created.
 	Zone string `json:"zone"`
 	// ServerGroups is a list of UUIDs identifying the server groups to which the new server will be added.
@@ -43,9 +54,6 @@ type CloudscaleMachineProviderSpec struct {
 	RootVolumeSizeGB int `json:"rootVolumeSizeGB"`
 	// SSHKeys is a list of SSH keys to add to the machine.
 	SSHKeys []string `json:"sshKeys"`
-	// UserData is the user data to pass to the machine.
-	// Can be used for ignition or cloud-init.
-	UserData string `json:"userData"`
 	// UseIPV6 is a flag to enable IPv6 on the machine.
 	// Defaults to true.
 	UseIPV6 *bool `json:"useIPV6,omitempty"`

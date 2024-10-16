@@ -20,32 +20,44 @@ import (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	K8sClient    client.Client
-	ServerClient cloudscale.ServerService
+	K8sClient client.Client
+
+	DefaultCloudscaleAPIToken string
+
+	ServerClientFactory func(token string) cloudscale.ServerService
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	K8sClient    client.Client
-	ServerClient cloudscale.ServerService
+	K8sClient client.Client
+
+	DefaultCloudscaleAPIToken string
+
+	ServerClientFactory func(token string) cloudscale.ServerService
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		K8sClient:    params.K8sClient,
-		ServerClient: params.ServerClient,
+		K8sClient:           params.K8sClient,
+		ServerClientFactory: params.ServerClientFactory,
 	}
 }
 
 // Create creates a machine and is invoked by the machine controller.
 func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) error {
 	l := log.FromContext(ctx).WithName("Actuator.Create")
-	origMachine := machine.DeepCopy()
 
-	spec, err := csv1beta1.ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
+	mctx, err := a.getMachineContext(ctx, machine)
 	if err != nil {
-		return fmt.Errorf("failed to get provider spec from machine %q: %w", machine.Name, err)
+		return fmt.Errorf("failed to get machine context: %w", err)
+	}
+	spec := mctx.spec
+	sc := a.ServerClientFactory(mctx.token)
+
+	userData, err := a.loadUserDataSecret(ctx, mctx)
+	if err != nil {
+		return fmt.Errorf("failed to load user data secret: %w", err)
 	}
 
 	// Null is not allowed for tags in the cloudscale API
@@ -71,9 +83,9 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		SSHKeys:      spec.SSHKeys,
 		UseIPV6:      spec.UseIPV6,
 		ServerGroups: spec.ServerGroups,
-		UserData:     spec.UserData,
+		UserData:     userData,
 	}
-	s, err := a.ServerClient.Create(ctx, req)
+	s, err := sc.Create(ctx, req)
 	if err != nil {
 		reqRaw, _ := json.Marshal(req)
 		return fmt.Errorf("failed to create machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
@@ -85,7 +97,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to update machine %q from cloudscale API response: %w", machine.Name, err)
 	}
 
-	if err := a.patchMachine(ctx, origMachine, machine); err != nil {
+	if err := a.patchMachine(ctx, mctx.machine, machine); err != nil {
 		return fmt.Errorf("failed to patch machine %q: %w", machine.Name, err)
 	}
 
@@ -93,15 +105,25 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 }
 
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {
-	s, err := a.getServer(ctx, machine)
+	mctx, err := a.getMachineContext(ctx, machine)
+	if err != nil {
+		return false, fmt.Errorf("failed to get machine context: %w", err)
+	}
+	sc := a.ServerClientFactory(mctx.token)
+
+	s, err := a.getServer(ctx, sc, machine)
 
 	return s != nil, err
 }
 
 func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) error {
-	origMachine := machine.DeepCopy()
+	mctx, err := a.getMachineContext(ctx, machine)
+	if err != nil {
+		return fmt.Errorf("failed to get machine context: %w", err)
+	}
+	sc := a.ServerClientFactory(mctx.token)
 
-	s, err := a.getServer(ctx, machine)
+	s, err := a.getServer(ctx, sc, machine)
 	if err != nil {
 		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
 	}
@@ -110,7 +132,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to update machine %q from cloudscale API response: %w", machine.Name, err)
 	}
 
-	if err := a.patchMachine(ctx, origMachine, machine); err != nil {
+	if err := a.patchMachine(ctx, mctx.machine, machine); err != nil {
 		return fmt.Errorf("failed to patch machine %q: %w", machine.Name, err)
 	}
 
@@ -120,7 +142,13 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) error {
 	l := log.FromContext(ctx).WithName("Actuator.Delete")
 
-	s, err := a.getServer(ctx, machine)
+	mctx, err := a.getMachineContext(ctx, machine)
+	if err != nil {
+		return fmt.Errorf("failed to get machine context: %w", err)
+	}
+	sc := a.ServerClientFactory(mctx.token)
+
+	s, err := a.getServer(ctx, sc, machine)
 	if err != nil {
 		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
 	}
@@ -130,15 +158,15 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 		return nil
 	}
 
-	if err := a.ServerClient.Delete(ctx, s.UUID); err != nil {
+	if err := sc.Delete(ctx, s.UUID); err != nil {
 		return fmt.Errorf("failed to delete server %q: %w", machine.Name, err)
 	}
 
 	return nil
 }
 
-func (a *Actuator) getServer(ctx context.Context, machine *machinev1beta1.Machine) (*cloudscale.Server, error) {
-	ss, err := a.ServerClient.List(ctx, cloudscale.WithNameFilter(machine.Name))
+func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, machine *machinev1beta1.Machine) (*cloudscale.Server, error) {
+	ss, err := sc.List(ctx, cloudscale.WithNameFilter(machine.Name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
@@ -256,4 +284,62 @@ func cloudscaleServerInterfacesFromProviderSpecInterfaces(interfaces []csv1beta1
 		cloudscaleInterfaces = append(cloudscaleInterfaces, ifr)
 	}
 	return &cloudscaleInterfaces
+}
+
+type machineContext struct {
+	machine *machinev1beta1.Machine
+	spec    csv1beta1.CloudscaleMachineProviderSpec
+	token   string
+}
+
+func (a *Actuator) getMachineContext(ctx context.Context, machine *machinev1beta1.Machine) (*machineContext, error) {
+	const tokenKey = "token"
+
+	origMachine := machine.DeepCopy()
+
+	spec, err := csv1beta1.ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider spec from machine %q: %w", machine.Name, err)
+	}
+
+	token := a.DefaultCloudscaleAPIToken
+	if spec.TokenSecret != nil {
+		secret := &corev1.Secret{}
+		if err := a.K8sClient.Get(ctx, client.ObjectKey{Name: spec.TokenSecret.Name, Namespace: machine.Namespace}, secret); err != nil {
+			return nil, fmt.Errorf("failed to get secret %q: %w", spec.TokenSecret.Name, err)
+		}
+
+		tb, ok := secret.Data[tokenKey]
+		if !ok {
+			return nil, fmt.Errorf("token key %q not found in secret %q", tokenKey, spec.TokenSecret.Name)
+		}
+
+		token = string(tb)
+	}
+
+	return &machineContext{
+		machine: origMachine,
+		spec:    *spec,
+		token:   token,
+	}, nil
+}
+
+func (a *Actuator) loadUserDataSecret(ctx context.Context, mctx *machineContext) (string, error) {
+	const userDataKey = "userData"
+
+	if mctx.spec.UserDataSecret == nil {
+		return "", nil
+	}
+
+	secret := &corev1.Secret{}
+	if err := a.K8sClient.Get(ctx, client.ObjectKey{Name: mctx.spec.UserDataSecret.Name, Namespace: mctx.machine.Namespace}, secret); err != nil {
+		return "", fmt.Errorf("failed to get secret %q: %w", mctx.spec.UserDataSecret.Name, err)
+	}
+
+	userData, ok := secret.Data[userDataKey]
+	if !ok {
+		return "", fmt.Errorf("%q key not found in secret %q", userDataKey, mctx.spec.UserDataSecret.Name)
+	}
+
+	return string(userData), nil
 }

@@ -27,7 +27,7 @@ import (
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
-	machinev1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/library-go/pkg/features"
 	capimachine "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/appuio/machine-api-provider-cloudscale/controllers"
 	"github.com/appuio/machine-api-provider-cloudscale/pkg/machine"
 )
 
@@ -53,7 +54,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(configv1.AddToScheme(scheme))
-	utilruntime.Must(machinev1.AddToScheme(scheme))
+	utilruntime.Must(machinev1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -170,6 +171,14 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 
 	if err := capimachine.AddWithActuator(mgr, machineActuator, featureGate); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Machine")
+		os.Exit(1)
+	}
+
+	if err := (&controllers.MachineSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MachineSet")
 		os.Exit(1)
 	}
 

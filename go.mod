@@ -9,6 +9,7 @@ require (
 	github.com/openshift/api v0.0.0-20240924155631-232984653385
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
 	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
+	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1
 	k8s.io/apiserver v0.31.1
@@ -75,6 +76,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20240918182115-6a8ead8397fd // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.20.4 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.0 // indirect

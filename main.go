@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"time"
@@ -147,16 +148,23 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 	}
 	userAgent := "machine-api-provider-cloudscale.appuio.io/" + versionString
 
+	newClient := func(token string) *cloudscale.Client {
+		cs := cloudscale.NewClient(http.DefaultClient)
+		cs.UserAgent = userAgent
+		cs.AuthToken = token
+		return cs
+	}
+
 	machineActuator := machine.NewActuator(machine.ActuatorParams{
 		K8sClient: mgr.GetClient(),
 
 		DefaultCloudscaleAPIToken: os.Getenv("CLOUDSCALE_API_TOKEN"),
 
 		ServerClientFactory: func(token string) cloudscale.ServerService {
-			cs := cloudscale.NewClient(nil)
-			cs.UserAgent = userAgent
-			cs.AuthToken = token
-			return cs.Servers
+			return newClient(token).Servers
+		},
+		ServerGroupClientFactory: func(token string) cloudscale.ServerGroupService {
+			return newClient(token).ServerGroups
 		},
 	})
 

@@ -34,8 +34,15 @@ type CloudscaleMachineProviderSpec struct {
 	// +optional
 	TokenSecret *corev1.LocalObjectReference `json:"tokenSecret,omitempty"`
 
+	// BaseDomain is the base domain to use for the machine.
+	// +optional
+	BaseDomain string `json:"baseDomain,omitempty"`
 	// Zone is the zone in which the machine will be created.
 	Zone string `json:"zone"`
+	// AntiAffinityKey is a key to use for anti-affinity. If set, the machine will be placed in different cloudscale server groups based on this key.
+	// The machines are automatically distributed across server groups with the same key.
+	// +optional
+	AntiAffinityKey string `json:"antiAffinityKey,omitempty"`
 	// ServerGroups is a list of UUIDs identifying the server groups to which the new server will be added.
 	// Used for anti-affinity.
 	// https://www.cloudscale.ch/en/api/v1#server-groups

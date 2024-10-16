@@ -18,13 +18,19 @@ import (
 	csv1beta1 "github.com/appuio/machine-api-provider-cloudscale/api/cloudscale/provider/v1beta1"
 )
 
+const (
+	antiAffinityTag = "machine-api-provider-cloudscale_appuio_io_antiAffinityKey"
+	machineNameTag  = "machine-api-provider-cloudscale_appuio_io_name"
+)
+
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
 	K8sClient client.Client
 
 	DefaultCloudscaleAPIToken string
 
-	ServerClientFactory func(token string) cloudscale.ServerService
+	ServerClientFactory      func(token string) cloudscale.ServerService
+	ServerGroupClientFactory func(token string) cloudscale.ServerGroupService
 }
 
 // ActuatorParams holds parameter information for Actuator.
@@ -33,14 +39,19 @@ type ActuatorParams struct {
 
 	DefaultCloudscaleAPIToken string
 
-	ServerClientFactory func(token string) cloudscale.ServerService
+	ServerClientFactory      func(token string) cloudscale.ServerService
+	ServerGroupClientFactory func(token string) cloudscale.ServerGroupService
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		K8sClient:           params.K8sClient,
-		ServerClientFactory: params.ServerClientFactory,
+		K8sClient: params.K8sClient,
+
+		DefaultCloudscaleAPIToken: params.DefaultCloudscaleAPIToken,
+
+		ServerClientFactory:      params.ServerClientFactory,
+		ServerGroupClientFactory: params.ServerGroupClientFactory,
 	}
 }
 
@@ -64,9 +75,25 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	if spec.Tags == nil {
 		spec.Tags = make(map[string]string)
 	}
+	spec.Tags[machineNameTag] = machine.Name
+
+	serverGroups := spec.ServerGroups
+	if spec.AntiAffinityKey != "" {
+		sgc := a.ServerGroupClientFactory(mctx.token)
+		aasg, err := a.ensureAntiAffinityServerGroupForKey(ctx, sgc, spec.Zone, spec.AntiAffinityKey)
+		if err != nil {
+			return fmt.Errorf("failed to ensure anti-affinity server group for machine %q and key %q: %w", machine.Name, spec.AntiAffinityKey, err)
+		}
+		serverGroups = append(serverGroups, aasg)
+	}
+
+	name := machine.Name
+	if spec.BaseDomain != "" {
+		name = fmt.Sprintf("%s.%s", name, spec.BaseDomain)
+	}
 
 	req := &cloudscale.ServerRequest{
-		Name: machine.Name,
+		Name: name,
 
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 			Tags: ptr.To(cloudscale.TagMap(spec.Tags)),
@@ -82,7 +109,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		Interfaces:   cloudscaleServerInterfacesFromProviderSpecInterfaces(spec.Interfaces),
 		SSHKeys:      spec.SSHKeys,
 		UseIPV6:      spec.UseIPV6,
-		ServerGroups: spec.ServerGroups,
+		ServerGroups: serverGroups,
 		UserData:     userData,
 	}
 	s, err := sc.Create(ctx, req)
@@ -166,7 +193,9 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 }
 
 func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, machine *machinev1beta1.Machine) (*cloudscale.Server, error) {
-	ss, err := sc.List(ctx, cloudscale.WithNameFilter(machine.Name))
+	lookupKey := cloudscale.TagMap{machineNameTag: machine.Name}
+
+	ss, err := sc.List(ctx, cloudscale.WithTagFilter(lookupKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
@@ -199,6 +228,46 @@ func (a *Actuator) patchMachine(ctx context.Context, orig, updated *machinev1bet
 	return nil
 }
 
+// ensureAntiAffinityServerGroupForKey ensures that a server group with less than 4 servers exists for the given key.
+// If such a server group exists, its UUID is returned.
+// If no such server group exists, a new server group is created and its UUID is returned.
+func (a *Actuator) ensureAntiAffinityServerGroupForKey(ctx context.Context, sgc cloudscale.ServerGroupService, zone, key string) (string, error) {
+	l := log.FromContext(ctx).WithName("Actuator.ensureAntiAffinityServerGroupForKey").WithValues("key", key, "zone", zone)
+	lookupKey := cloudscale.TagMap{antiAffinityTag: key}
+
+	sgs, err := sgc.List(ctx, cloudscale.WithTagFilter(lookupKey))
+	if err != nil {
+		return "", fmt.Errorf("failed to list server groups: %w", err)
+	}
+
+	for _, sg := range sgs {
+		if sg.Zone.Slug == zone {
+			if len(sg.Servers) < 4 {
+				l.Info("Found existing server group with less than 4 servers", "serverGroup", sg.UUID)
+				return sg.UUID, nil
+			}
+		}
+	}
+
+	l.Info("No server group with less than 4 servers left, creating new server group")
+	sg, err := sgc.Create(ctx, &cloudscale.ServerGroupRequest{
+		ZonalResourceRequest: cloudscale.ZonalResourceRequest{
+			Zone: zone,
+		},
+		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+			Tags: ptr.To(lookupKey),
+		},
+		Name: key,
+		Type: "anti-affinity",
+	})
+	if err != nil {
+		l.Error(err, "Failed to create server group")
+		return "", fmt.Errorf("failed to create server group: %w", err)
+	}
+
+	return sg.UUID, nil
+}
+
 func updateMachineFromCloudscaleServer(machine *machinev1beta1.Machine, s cloudscale.Server) error {
 	if machine.Labels == nil {
 		machine.Labels = make(map[string]string)
@@ -222,7 +291,12 @@ func updateMachineFromCloudscaleServer(machine *machinev1beta1.Machine, s clouds
 }
 
 func machineAddressesFromCloudscaleServer(s cloudscale.Server) []corev1.NodeAddress {
-	var addresses []corev1.NodeAddress
+	addresses := []corev1.NodeAddress{
+		{
+			Type:    corev1.NodeHostName,
+			Address: s.Name,
+		},
+	}
 
 	for _, n := range s.Interfaces {
 		typ := corev1.NodeInternalIP

@@ -302,6 +302,21 @@ func machineAddressesFromCloudscaleServer(s cloudscale.Server) []corev1.NodeAddr
 			Type:    corev1.NodeHostName,
 			Address: s.Name,
 		},
+		{
+			Type:    corev1.NodeInternalDNS,
+			Address: s.Name,
+		},
+	}
+
+	// Important for the automatic CSR approval
+	// There must be one address of type NodeInternalDNS that matches the hostname
+	// https://github.com/openshift/cluster-machine-approver?tab=readme-ov-file#node-client-csr-approval-workflow
+	hostname := strings.Split(s.Name, ".")[0]
+	if s.Name != hostname {
+		addresses = append(addresses, corev1.NodeAddress{
+			Type:    corev1.NodeInternalDNS,
+			Address: hostname,
+		})
 	}
 
 	for _, n := range s.Interfaces {

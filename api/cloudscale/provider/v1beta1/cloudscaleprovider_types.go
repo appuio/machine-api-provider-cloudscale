@@ -25,7 +25,10 @@ type CloudscaleMachineProviderSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// UserDataSecret is a reference to a secret that contains the UserData to apply to the instance.
-	// The secret must contain a key named userData.
+	// The secret must contain a key named userData. The value is evaluated using Jsonnet; it can be either pure JSON or a Jsonnet template.
+	// The Jsonnet template has access to the following variables:
+	// - std.extVar('context').machine: the Machine object. The name can be accessed via std.extVar('context').machine.metadata.name for example.
+	// - std.extVar('context').data: all keys from the UserDataSecret. For example, std.extVar('context').data.foo will access the value of the key foo.
 	// +optional
 	UserDataSecret *corev1.LocalObjectReference `json:"userDataSecret,omitempty"`
 	// TokenSecret is a reference to the secret with the Cloudscale API token.

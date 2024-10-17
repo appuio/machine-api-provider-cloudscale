@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
+	"github.com/google/go-jsonnet"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
@@ -66,7 +67,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	spec := mctx.spec
 	sc := a.ServerClientFactory(mctx.token)
 
-	userData, err := a.loadUserDataSecret(ctx, mctx)
+	userData, err := a.loadAndRenderUserDataSecret(ctx, mctx)
 	if err != nil {
 		return fmt.Errorf("failed to load user data secret: %w", err)
 	}
@@ -76,6 +77,11 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		spec.Tags = make(map[string]string)
 	}
 	spec.Tags[machineNameTag] = machine.Name
+
+	// Null is not allowed for SSH keys in the cloudscale API
+	if spec.SSHKeys == nil {
+		spec.SSHKeys = []string{}
+	}
 
 	serverGroups := spec.ServerGroups
 	if spec.AntiAffinityKey != "" {
@@ -398,7 +404,7 @@ func (a *Actuator) getMachineContext(ctx context.Context, machine *machinev1beta
 	}, nil
 }
 
-func (a *Actuator) loadUserDataSecret(ctx context.Context, mctx *machineContext) (string, error) {
+func (a *Actuator) loadAndRenderUserDataSecret(ctx context.Context, mctx *machineContext) (string, error) {
 	const userDataKey = "userData"
 
 	if mctx.spec.UserDataSecret == nil {
@@ -410,10 +416,44 @@ func (a *Actuator) loadUserDataSecret(ctx context.Context, mctx *machineContext)
 		return "", fmt.Errorf("failed to get secret %q: %w", mctx.spec.UserDataSecret.Name, err)
 	}
 
-	userData, ok := secret.Data[userDataKey]
+	userDataRaw, ok := secret.Data[userDataKey]
 	if !ok {
 		return "", fmt.Errorf("%q key not found in secret %q", userDataKey, mctx.spec.UserDataSecret.Name)
 	}
+	userData := string(userDataRaw)
 
-	return string(userData), nil
+	if userData == "" {
+		return "", nil
+	}
+
+	data := make(map[string]string, len(secret.Data))
+	for k, v := range secret.Data {
+		data[k] = string(v)
+	}
+
+	jvm, err := jsonnetVMWithContext(mctx.machine, data)
+	if err != nil {
+		return "", fmt.Errorf("userData: failed to create jsonnet VM: %w", err)
+	}
+	ud, err := jvm.EvaluateAnonymousSnippet("context", userData)
+	if err != nil {
+		return "", fmt.Errorf("userData: failed to evaluate jsonnet: %w", err)
+	}
+
+	return ud, nil
+}
+
+func jsonnetVMWithContext(machine *machinev1beta1.Machine, data map[string]string) (*jsonnet.VM, error) {
+	jcr, err := json.Marshal(map[string]any{
+		"machine": machine,
+		"data":    data,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal jsonnet context: %w", err)
+	}
+	jvm := jsonnet.MakeVM()
+	jvm.ExtCode("context", string(jcr))
+	// Don't allow imports
+	jvm.Importer(&jsonnet.MemoryImporter{})
+	return jvm, nil
 }

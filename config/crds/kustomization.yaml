@@ -1,0 +1,4 @@
+resources:
+- machine.openshift.io.crd.yaml
+- machinehealthcheck.openshift.io.crd.yaml
+- machineset.openshift.io.crd.yaml

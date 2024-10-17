@@ -1,0 +1,40 @@
+# Known working config creating a node that will join a OCP cluster.
+# Create the userDataSecret with
+#   $ ./pkg/machine/userdata/userdata-secret-from-maintfjson.sh c-appuio-lab-cloudscale-rma-0/manifests/openshift4-terraform/main.tf.json
+#
+# Created from this config:
+#   $ k get machine,node app-7ws9q
+#   NAME                                     PHASE     TYPE        REGION   ZONE   AGE
+#   machine.machine.openshift.io/app-7ws9q   Running   flex-16-4   rma      rma1   3m38s
+#
+#   NAME             STATUS   ROLES        AGE   VERSION
+#   node/app-7ws9q   Ready    app,worker   59s   v1.28.13+2ca1a23
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  annotations: {}
+  generateName: app-
+  labels:
+    machine.openshift.io/cluster-api-cluster: c-appuio-lab-cloudscale-rma-0
+spec:
+  lifecycleHooks: {}
+  metadata:
+    labels:
+      node-role.kubernetes.io/app: ""
+      node-role.kubernetes.io/worker: ""
+  providerSpec:
+    value:
+      zone: rma1
+      baseDomain: lab-cloudscale-rma-0.appuio.cloud
+      flavor: flex-16-4
+      image: custom:rhcos-4.15
+      rootVolumeSizeGB: 100
+      antiAffinityKey: app
+      interfaces:
+      - type: Private
+        networkUUID: fd2b132d-f5d0-4024-b99f-68e5321ab4d1
+      userDataSecret:
+        name: cloudscale-user-data
+      tokenSecret:
+        name: cloudscale-rw-token
+status: {}

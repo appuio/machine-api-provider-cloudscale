@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nodelink-controller
+  name: dev-nodelink-controller
   namespace: openshift-machine-api
 spec:
   progressDeadlineSeconds: 600
@@ -9,11 +9,11 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: nodelink-controller
+      app: dev-nodelink-controller
   template:
     metadata:
       labels:
-        app: nodelink-controller
+        app: dev-nodelink-controller
     spec:
       containers:
       - args:
@@ -24,7 +24,7 @@ spec:
         - --namespace=openshift-machine-api
         command:
         - /nodelink-controller
-        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ad0bb293968c38d282e3d348872007ce780bc1be1407bce62528cae0f4814161
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev
         imagePullPolicy: IfNotPresent
         name: nodelink-controller
         resources:

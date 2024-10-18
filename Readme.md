@@ -32,8 +32,14 @@ kubectl apply -f config/samples/machine-cloudscale-generic.yml
 ### Testing on a Project Syn managed OCP cluster
 
 ```bash
-# Deploy nodelink-controller if not already deployed
-kubectl apply -f config/deploy/nodelink-controller.yml
+# Switch to the openshift-machine-api namespace
+yq -i '.current-context as $cc | with((.contexts[] | select(.name == $cc) | .context); .namespace = "openshift-machine-api")' ${KUBECONFIG:-$HOME/.kube/config}
+# Become system:admin
+yq -i '.current-context as $cc | (.contexts[] | select(.name == $cc) | .context.user) as $cu | with(.users[] | select(.name == $cu); .user.as = "system:admin")' ${KUBECONFIG:-$HOME/.kube/config}
+oc whoami
+
+# Deploy nodelink controller if required
+hack/deploy-nodelink-controller.sh
 
 # Generate the userData secret from the main.tf.json in the cluster catalog
 ./pkg/machine/userdata/userdata-secret-from-maintfjson.sh manifests/openshift4-terraform/main.tf.json | k apply -f-

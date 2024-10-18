@@ -363,6 +363,8 @@ func cloudscaleServerInterfacesFromProviderSpecInterfaces(interfaces []csv1beta1
 	var cloudscaleInterfaces []cloudscale.InterfaceRequest
 	for _, i := range interfaces {
 		if i.Type == csv1beta1.InterfaceTypePublic {
+			// From the cloudscale terraform provider. Public interfaces have no other configuration options.
+			// https://github.com/cloudscale-ch/terraform-provider-cloudscale/blob/56f5cb40396e489657ee965a5f066b8a9f5c1bd5/cloudscale/resource_cloudscale_server.go#L424-L427
 			cloudscaleInterfaces = append(cloudscaleInterfaces, cloudscale.InterfaceRequest{
 				Network: "public",
 			})

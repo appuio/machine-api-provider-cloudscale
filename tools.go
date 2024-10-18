@@ -11,4 +11,7 @@ import (
 
 	// This is basically KubeBuilder
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
+
+	// Used to mock the cloudscale Go client
+	_ "go.uber.org/mock/mockgen"
 )

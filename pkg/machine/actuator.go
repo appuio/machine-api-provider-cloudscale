@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,13 +26,17 @@ const (
 )
 
 // Actuator is responsible for performing machine reconciliation.
+// It creates, updates, and deletes machines.
+// Currently changing machine spec is not supported.
+// The user data is rendered using Jsonnet with the machine and secret data as context.
+// Machines are automatically spread across server groups on create based on the AntiAffinityKey.
 type Actuator struct {
-	K8sClient client.Client
+	k8sClient client.Client
 
-	DefaultCloudscaleAPIToken string
+	defaultCloudscaleAPIToken string
 
-	ServerClientFactory      func(token string) cloudscale.ServerService
-	ServerGroupClientFactory func(token string) cloudscale.ServerGroupService
+	serverClientFactory      func(token string) cloudscale.ServerService
+	serverGroupClientFactory func(token string) cloudscale.ServerGroupService
 }
 
 // ActuatorParams holds parameter information for Actuator.
@@ -47,12 +52,12 @@ type ActuatorParams struct {
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		K8sClient: params.K8sClient,
+		k8sClient: params.K8sClient,
 
-		DefaultCloudscaleAPIToken: params.DefaultCloudscaleAPIToken,
+		defaultCloudscaleAPIToken: params.DefaultCloudscaleAPIToken,
 
-		ServerClientFactory:      params.ServerClientFactory,
-		ServerGroupClientFactory: params.ServerGroupClientFactory,
+		serverClientFactory:      params.ServerClientFactory,
+		serverGroupClientFactory: params.ServerGroupClientFactory,
 	}
 }
 
@@ -65,7 +70,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to get machine context: %w", err)
 	}
 	spec := mctx.spec
-	sc := a.ServerClientFactory(mctx.token)
+	sc := a.serverClientFactory(mctx.token)
 
 	userData, err := a.loadAndRenderUserDataSecret(ctx, mctx)
 	if err != nil {
@@ -85,7 +90,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	serverGroups := spec.ServerGroups
 	if spec.AntiAffinityKey != "" {
-		sgc := a.ServerGroupClientFactory(mctx.token)
+		sgc := a.serverGroupClientFactory(mctx.token)
 		aasg, err := a.ensureAntiAffinityServerGroupForKey(ctx, sgc, spec.Zone, spec.AntiAffinityKey)
 		if err != nil {
 			return fmt.Errorf("failed to ensure anti-affinity server group for machine %q and key %q: %w", machine.Name, spec.AntiAffinityKey, err)
@@ -142,7 +147,7 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) 
 	if err != nil {
 		return false, fmt.Errorf("failed to get machine context: %w", err)
 	}
-	sc := a.ServerClientFactory(mctx.token)
+	sc := a.serverClientFactory(mctx.token)
 
 	s, err := a.getServer(ctx, sc, machine)
 
@@ -154,7 +159,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	if err != nil {
 		return fmt.Errorf("failed to get machine context: %w", err)
 	}
-	sc := a.ServerClientFactory(mctx.token)
+	sc := a.serverClientFactory(mctx.token)
 
 	s, err := a.getServer(ctx, sc, machine)
 	if err != nil {
@@ -179,7 +184,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 	if err != nil {
 		return fmt.Errorf("failed to get machine context: %w", err)
 	}
-	sc := a.ServerClientFactory(mctx.token)
+	sc := a.serverClientFactory(mctx.token)
 
 	s, err := a.getServer(ctx, sc, machine)
 	if err != nil {
@@ -222,12 +227,12 @@ func (a *Actuator) patchMachine(ctx context.Context, orig, updated *machinev1bet
 
 	st := *updated.Status.DeepCopy()
 
-	if err := a.K8sClient.Patch(ctx, updated, client.MergeFrom(orig)); err != nil {
+	if err := a.k8sClient.Patch(ctx, updated, client.MergeFrom(orig)); err != nil {
 		return fmt.Errorf("failed to patch machine %q: %w", updated.Name, err)
 	}
 
 	updated.Status = st
-	if err := a.K8sClient.Status().Patch(ctx, updated, client.MergeFrom(orig)); err != nil {
+	if err := a.k8sClient.Status().Patch(ctx, updated, client.MergeFrom(orig)); err != nil {
 		return fmt.Errorf("failed to patch machine status %q: %w", updated.Name, err)
 	}
 
@@ -308,9 +313,12 @@ func machineAddressesFromCloudscaleServer(s cloudscale.Server) []corev1.NodeAddr
 		},
 	}
 
-	// Important for the automatic CSR approval
-	// There must be one address of type NodeInternalDNS that matches the hostname
-	// https://github.com/openshift/cluster-machine-approver?tab=readme-ov-file#node-client-csr-approval-workflow
+	// https://github.com/openshift/cluster-machine-approver?tab=readme-ov-file#requirements-for-cluster-api-providers
+	// * A Machine must have a NodeInternalDNS set in Status.Addresses that matches the name of the Node.
+	//   The NodeInternalDNS entry must be present, even before the Node resource is created.
+	// * A Machine must also have matching NodeInternalDNS, NodeExternalDNS, NodeHostName, NodeInternalIP, and NodeExternalIP addresses
+	//   as those listed on the Node resource. All of these addresses are placed in the CSR and are validated against the addresses
+	//   on the Machine object.
 	hostname := strings.Split(s.Name, ".")[0]
 	if s.Name != hostname {
 		addresses = append(addresses, corev1.NodeAddress{
@@ -397,10 +405,10 @@ func (a *Actuator) getMachineContext(ctx context.Context, machine *machinev1beta
 		return nil, fmt.Errorf("failed to get provider spec from machine %q: %w", machine.Name, err)
 	}
 
-	token := a.DefaultCloudscaleAPIToken
+	token := a.defaultCloudscaleAPIToken
 	if spec.TokenSecret != nil {
 		secret := &corev1.Secret{}
-		if err := a.K8sClient.Get(ctx, client.ObjectKey{Name: spec.TokenSecret.Name, Namespace: machine.Namespace}, secret); err != nil {
+		if err := a.k8sClient.Get(ctx, client.ObjectKey{Name: spec.TokenSecret.Name, Namespace: machine.Namespace}, secret); err != nil {
 			return nil, fmt.Errorf("failed to get secret %q: %w", spec.TokenSecret.Name, err)
 		}
 
@@ -427,7 +435,7 @@ func (a *Actuator) loadAndRenderUserDataSecret(ctx context.Context, mctx *machin
 	}
 
 	secret := &corev1.Secret{}
-	if err := a.K8sClient.Get(ctx, client.ObjectKey{Name: mctx.spec.UserDataSecret.Name, Namespace: mctx.machine.Namespace}, secret); err != nil {
+	if err := a.k8sClient.Get(ctx, client.ObjectKey{Name: mctx.spec.UserDataSecret.Name, Namespace: mctx.machine.Namespace}, secret); err != nil {
 		return "", fmt.Errorf("failed to get secret %q: %w", mctx.spec.UserDataSecret.Name, err)
 	}
 
@@ -455,7 +463,12 @@ func (a *Actuator) loadAndRenderUserDataSecret(ctx context.Context, mctx *machin
 		return "", fmt.Errorf("userData: failed to evaluate jsonnet: %w", err)
 	}
 
-	return ud, nil
+	var compacted bytes.Buffer
+	if err := json.Compact(&compacted, []byte(ud)); err != nil {
+		return "", fmt.Errorf("userData: failed to compact json: %w", err)
+	}
+
+	return compacted.String(), nil
 }
 
 func jsonnetVMWithContext(machine *machinev1beta1.Machine, data map[string]string) (*jsonnet.VM, error) {

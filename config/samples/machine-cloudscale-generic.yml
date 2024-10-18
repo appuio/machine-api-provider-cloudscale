@@ -1,0 +1,26 @@
+# Minimal generic config that will not join any node but just creating a machine
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  annotations: {}
+  generateName: app-
+  labels:
+    machine.openshift.io/cluster-api-cluster: cluster-1
+spec:
+  lifecycleHooks: {}
+  metadata:
+    labels:
+      node-role.kubernetes.io/app: ""
+      node-role.kubernetes.io/worker: ""
+  providerSpec:
+    value:
+      zone: lpg1
+      baseDomain: cluster-1.appuio.io
+      flavor: flex-4-1
+      image: debian-12
+      rootVolumeSizeGB: 50
+      antiAffinityKey: app
+      sshKeys: []
+      interfaces:
+      - type: Public
+status: {}

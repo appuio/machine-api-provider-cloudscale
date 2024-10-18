@@ -2,7 +2,22 @@
 
 Provider for cloudscale.ch for the OpenShift machine-api.
 
-## Testing on a local non-OCP cluster
+## Development
+
+## Updating OCP dependencies
+
+```bash
+RELEASE=release-4.XX
+go get -u "github.com/openshift/api@${RELEASE}"
+go get -u "github.com/openshift/library-go@${RELEASE}"
+go get -u "github.com/openshift/machine-api-operator@${RELEASE}"
+go mod tidy
+
+# Update the CRDs required for testing on a local non-OCP cluster
+make sync-crds
+```
+
+### Testing on a local non-OCP cluster
 
 ```bash
 # Apply required upstream CRDs
@@ -14,7 +29,7 @@ make run
 kubectl apply -f config/samples/machine-cloudscale-generic.yml
 ```
 
-## Testing on a Project Syn managed OCP cluster
+### Testing on a Project Syn managed OCP cluster
 
 ```bash
 # Deploy nodelink-controller if not already deployed

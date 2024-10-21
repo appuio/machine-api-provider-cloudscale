@@ -62,13 +62,13 @@ func (r *MachineSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	flavour, err := parseCloudscaleFlavour(spec.Flavor)
+	flavor, err := parseCloudscaleFlavor(spec.Flavor)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to parse flavour %q: %w", spec.Flavor, err)
+		return ctrl.Result{}, fmt.Errorf("failed to parse flavor %q: %w", spec.Flavor, err)
 	}
 
-	machineSet.Annotations[cpuKey] = strconv.Itoa(flavour.CPU)
-	machineSet.Annotations[memoryKey] = strconv.Itoa(flavour.MemGB * 1024)
+	machineSet.Annotations[cpuKey] = strconv.Itoa(flavor.CPU)
+	machineSet.Annotations[memoryKey] = strconv.Itoa(flavor.MemGB * 1024)
 	machineSet.Annotations[gpuKey] = gpuKeyValue
 
 	// We guarantee that any existing labels provided via the capacity annotations are preserved.
@@ -95,31 +95,31 @@ func (r *MachineSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-type cloudscaleFlavour struct {
+type cloudscaleFlavor struct {
 	Type  string
 	CPU   int
 	MemGB int
 }
 
-var cloudscaleFlavourRegexp = regexp.MustCompile(`^(\w+)-(\d+)-(\d+)$`)
+var cloudscaleFlavorRegexp = regexp.MustCompile(`^(\w+)-(\d+)-(\d+)$`)
 
-// Parse parses a cloudscale flavour string.
-func parseCloudscaleFlavour(flavour string) (cloudscaleFlavour, error) {
-	parts := cloudscaleFlavourRegexp.FindStringSubmatch(flavour)
+// Parse parses a cloudscale flavor string.
+func parseCloudscaleFlavor(flavor string) (cloudscaleFlavor, error) {
+	parts := cloudscaleFlavorRegexp.FindStringSubmatch(flavor)
 
 	if len(parts) != 4 {
-		return cloudscaleFlavour{}, fmt.Errorf("flavour %q does not match expected format", flavour)
+		return cloudscaleFlavor{}, fmt.Errorf("flavor %q does not match expected format", flavor)
 	}
 	mem, err := strconv.Atoi(parts[2])
 	if err != nil {
-		return cloudscaleFlavour{}, fmt.Errorf("failed to parse memory from flavour %q: %w", flavour, err)
+		return cloudscaleFlavor{}, fmt.Errorf("failed to parse memory from flavor %q: %w", flavor, err)
 	}
 	cpu, err := strconv.Atoi(parts[3])
 	if err != nil {
-		return cloudscaleFlavour{}, fmt.Errorf("failed to parse CPU from flavour %q: %w", flavour, err)
+		return cloudscaleFlavor{}, fmt.Errorf("failed to parse CPU from flavor %q: %w", flavor, err)
 	}
 
-	return cloudscaleFlavour{
+	return cloudscaleFlavor{
 		Type:  parts[1],
 		CPU:   cpu,
 		MemGB: mem,

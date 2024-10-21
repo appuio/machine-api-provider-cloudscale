@@ -56,6 +56,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 						Address:    "172.10.11.12",
 					},
 				},
+			}, {
+				Type: csv1beta1.InterfaceTypePublic,
 			},
 		},
 	}
@@ -124,13 +126,17 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			Flavor:       providerSpec.Flavor,
 			Image:        providerSpec.Image,
 			VolumeSizeGB: providerSpec.RootVolumeSizeGB,
-			Interfaces: ptr.To([]cloudscale.InterfaceRequest{{
-				Network: providerSpec.Interfaces[0].NetworkUUID,
-				Addresses: &[]cloudscale.AddressRequest{{
-					Subnet:  providerSpec.Interfaces[0].Addresses[0].SubnetUUID,
-					Address: providerSpec.Interfaces[0].Addresses[0].Address,
-				}},
-			}}),
+			Interfaces: ptr.To([]cloudscale.InterfaceRequest{
+				{
+					Network: providerSpec.Interfaces[0].NetworkUUID,
+					Addresses: &[]cloudscale.AddressRequest{{
+						Subnet:  providerSpec.Interfaces[0].Addresses[0].SubnetUUID,
+						Address: providerSpec.Interfaces[0].Addresses[0].Address,
+					}},
+				}, {
+					Network: "public",
+				},
+			}),
 			SSHKeys:      []string{},
 			UseIPV6:      providerSpec.UseIPV6,
 			ServerGroups: []string{"created-server-group-uuid"},

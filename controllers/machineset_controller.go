@@ -110,13 +110,13 @@ func parseCloudscaleFlavour(flavour string) (cloudscaleFlavour, error) {
 	if len(parts) != 4 {
 		return cloudscaleFlavour{}, fmt.Errorf("flavour %q does not match expected format", flavour)
 	}
-	cpu, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return cloudscaleFlavour{}, fmt.Errorf("failed to parse CPU from flavour %q: %w", flavour, err)
-	}
-	mem, err := strconv.Atoi(parts[3])
+	mem, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return cloudscaleFlavour{}, fmt.Errorf("failed to parse memory from flavour %q: %w", flavour, err)
+	}
+	cpu, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return cloudscaleFlavour{}, fmt.Errorf("failed to parse CPU from flavour %q: %w", flavour, err)
 	}
 
 	return cloudscaleFlavour{

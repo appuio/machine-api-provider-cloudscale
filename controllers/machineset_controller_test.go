@@ -35,7 +35,7 @@ func Test_MachineSetReconciler_Reconcile(t *testing.T) {
 		Spec: machinev1beta1.MachineSetSpec{},
 	}
 
-	setFlavorOnMachineSet(ms, "plus-2-4")
+	setFlavorOnMachineSet(ms, "plus-4-2")
 
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).

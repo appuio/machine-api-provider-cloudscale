@@ -43,7 +43,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		BaseDomain:       "cluster.example.com",
 		Zone:             "rma1",
 		AntiAffinityKey:  "app",
-		Flavor:           "flex-4-16",
+		Flavor:           "flex-16-4",
 		Image:            "custom:rhcos-4.15",
 		RootVolumeSizeGB: 100,
 		Interfaces: []csv1beta1.Interface{
@@ -150,7 +150,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 
 	// Labels are just for show with kubectl get
 	if assert.NotNil(t, updatedMachine.Labels) {
-		assert.Equal(t, "flex-4-16", updatedMachine.Labels[machinecontroller.MachineInstanceTypeLabelName])
+		assert.Equal(t, "flex-16-4", updatedMachine.Labels[machinecontroller.MachineInstanceTypeLabelName])
 		assert.Equal(t, "rma1", updatedMachine.Labels[machinecontroller.MachineAZLabelName])
 		assert.Equal(t, "rma", updatedMachine.Labels[machinecontroller.MachineRegionLabelName])
 	}

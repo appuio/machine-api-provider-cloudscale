@@ -24,9 +24,15 @@ test: ## Run tests
 .PHONY: build
 build: generate fmt vet $(BIN_FILENAME) ## Build manager binary
 
+.PHONY: sync-crds
+sync-crds: ## Sync required openshift CRDs for local testing
+	go mod vendor -o .tmpvendor
+	VENDOR_DIR=.tmpvendor ./hack/sync-crds.sh
+
 .PHONY: generate
 generate: ## Generate e.g. CRD, RBAC etc.
 	go generate ./...
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen object paths="./..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code
@@ -37,7 +43,7 @@ vet: ## Run go vet against code
 	go vet ./...
 
 .PHONY: lint
-lint: fmt vet generate ## All-in-one linting
+lint: fmt vet generate sync-crds ## All-in-one linting
 	@echo 'Check for uncommitted changes ...'
 	git diff --exit-code
 
@@ -48,6 +54,7 @@ build.docker: $(BIN_FILENAME) ## Build the docker image
 
 clean: ## Cleans up the generated resources
 	rm -rf dist/ cover.out $(BIN_FILENAME) || true
+	rm -rf .tmpvendor
 
 .PHONY: run
 run: generate fmt vet ## Run a controller from your host.

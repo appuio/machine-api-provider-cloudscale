@@ -15,7 +15,7 @@ const (
 )
 
 // CloudscaleMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field
-// for a Cloudscale virtual machine. It is used by the GCP machine actuator to create a single Machine.
+// for a cloudscale virtual machine. It is used by the cloudscale machine actuator to create a single Machine.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CloudscaleMachineProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
@@ -31,9 +31,9 @@ type CloudscaleMachineProviderSpec struct {
 	// - std.extVar('context').data: all keys from the UserDataSecret. For example, std.extVar('context').data.foo will access the value of the key foo.
 	// +optional
 	UserDataSecret *corev1.LocalObjectReference `json:"userDataSecret,omitempty"`
-	// TokenSecret is a reference to the secret with the Cloudscale API token.
+	// TokenSecret is a reference to the secret with the cloudscale API token.
 	// The secret must contain a key named token.
-	// If not token is provided, the operator will try to use the default token from CLOUDSCALE_API_TOKEN.
+	// If no token is provided, the operator will try to use the default token from CLOUDSCALE_API_TOKEN.
 	// +optional
 	TokenSecret *corev1.LocalObjectReference `json:"tokenSecret,omitempty"`
 

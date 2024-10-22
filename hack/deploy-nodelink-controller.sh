@@ -6,7 +6,8 @@ set -euo pipefail
 
 
 UPSTREAM_NODELINK_DEPLOYMENT="machine-api-controllers"
-UPSTREAM_MACHINE_API_OPERATOR_DEPLOYMENT="machine-api-operator"
+IMAGES_CONFIG_MAP="machine-api-operator-images"
+OPERATOR_IMAGE_KEY="machineAPIOperator"
 
 if kubectl get deployment "${UPSTREAM_NODELINK_DEPLOYMENT}" &> /dev/null; then
   echo "Real upstream nodelink deployment already exists, skipping"
@@ -15,7 +16,7 @@ fi
 
 tmpdir=$(mktemp -d)
 
-image=$(kubectl get deployment "${UPSTREAM_MACHINE_API_OPERATOR_DEPLOYMENT}" -oyaml | yq '.spec.template.spec.containers | filter(.name == "machine-api-operator") | .[0].image')
+image=$(kubectl get configmap "${IMAGES_CONFIG_MAP}" -oyaml | yq '.data["images.json"] | from_yaml | .["'"${OPERATOR_IMAGE_KEY}"'"]')
 
 imageParts=(${image//@/ })
 

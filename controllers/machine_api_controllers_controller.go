@@ -10,7 +10,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,27 +72,7 @@ func (r *MachineAPIControllersReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, fmt.Errorf("failed to check for original upstream deployment %s: %w", originalUpstreamDeploymentName, err)
 	}
 
-	caBundleConfigMap := corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      caBundleConfigMapName,
-			Namespace: r.Namespace,
-			Labels: map[string]string{
-				"config.openshift.io/inject-trusted-cabundle": "true",
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(&imageCM, &caBundleConfigMap, r.Scheme); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to set controller reference: %w", err)
-	}
-	if err := r.Client.Patch(ctx, &caBundleConfigMap, client.Apply, client.FieldOwner("upstream-deployment-controller")); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to apply ConfigMap %q: %w", caBundleConfigMapName, err)
-	}
-
-	vm, err := jsonnetVMWithContext(images, caBundleConfigMap)
+	vm, err := jsonnetVMWithContext(images)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create jsonnet VM: %w", err)
 	}
@@ -128,14 +107,12 @@ func (r *MachineAPIControllersReconciler) SetupWithManager(mgr ctrl.Manager) err
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
 
-func jsonnetVMWithContext(images map[string]string, cabundle corev1.ConfigMap) (*jsonnet.VM, error) {
+func jsonnetVMWithContext(images map[string]string) (*jsonnet.VM, error) {
 	jcr, err := json.Marshal(map[string]any{
-		"images":   images,
-		"cabundle": cabundle,
+		"images": images,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal jsonnet context: %w", err)

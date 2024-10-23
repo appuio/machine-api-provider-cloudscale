@@ -76,7 +76,6 @@ local controllersDeployment = {
     template: {
       metadata: {
         annotations: {
-          cabundlemd5: std.md5(std.manifestJsonMinified(std.get(context.cabundle, 'data', {}))),
           'target.workload.openshift.io/management': '{"effect": "PreferredDuringScheduling"}',
         },
         creationTimestamp: null,
@@ -147,91 +146,6 @@ local controllersDeployment = {
               {
                 mountPath: '/etc/machine-api-operator/tls',
                 name: 'machineset-webhook-cert',
-                readOnly: true,
-              },
-            ],
-          },
-          {
-            args: [
-              '--logtostderr=true',
-              '--v=3',
-              '--leader-elect=true',
-              '--leader-elect-lease-duration=120s',
-              '--namespace=openshift-machine-api',
-            ],
-            command: [
-              '/machine-controller-manager',
-            ],
-            env: [
-              {
-                name: 'NODE_NAME',
-                valueFrom: {
-                  fieldRef: {
-                    apiVersion: 'v1',
-                    fieldPath: 'spec.nodeName',
-                  },
-                },
-              },
-            ],
-            image: controllerImage,
-            imagePullPolicy: 'IfNotPresent',
-            livenessProbe: {
-              failureThreshold: 3,
-              httpGet: {
-                path: '/readyz',
-                port: 'healthz',
-                scheme: 'HTTP',
-              },
-              periodSeconds: 10,
-              successThreshold: 1,
-              timeoutSeconds: 1,
-            },
-            name: 'machine-controller',
-            ports: [
-              {
-                containerPort: 8440,
-                name: 'machine-webhook',
-                protocol: 'TCP',
-              },
-              {
-                containerPort: 9440,
-                name: 'healthz',
-                protocol: 'TCP',
-              },
-            ],
-            readinessProbe: {
-              failureThreshold: 3,
-              httpGet: {
-                path: '/healthz',
-                port: 'healthz',
-                scheme: 'HTTP',
-              },
-              periodSeconds: 10,
-              successThreshold: 1,
-              timeoutSeconds: 1,
-            },
-            resources: {
-              requests: {
-                cpu: '10m',
-                memory: '20Mi',
-              },
-            },
-            terminationMessagePath: '/dev/termination-log',
-            terminationMessagePolicy: 'File',
-            volumeMounts: [
-              {
-                mountPath: '/etc/pki/ca-trust/extracted/pem',
-                name: 'trusted-ca',
-                readOnly: true,
-              },
-              {
-                mountPath: '/var/run/secrets/openshift/serviceaccount',
-                name: 'bound-sa-token',
-                readOnly: true,
-              },
-              {
-                mountPath: '/etc/machine-api-operator/tls',
-                name: 'machine-webhook-cert',
                 readOnly: true,
               },
             ],
@@ -367,38 +281,6 @@ local controllersDeployment = {
             },
           },
           {
-            name: 'machine-webhook-cert',
-            secret: {
-              defaultMode: 420,
-              items: [
-                {
-                  key: 'tls.crt',
-                  path: 'tls.crt',
-                },
-                {
-                  key: 'tls.key',
-                  path: 'tls.key',
-                },
-              ],
-              secretName: 'machine-api-operator-machine-webhook-cert',
-            },
-          },
-          {
-            name: 'bound-sa-token',
-            projected: {
-              defaultMode: 420,
-              sources: [
-                {
-                  serviceAccountToken: {
-                    audience: 'openshift',
-                    expirationSeconds: 3600,
-                    path: 'token',
-                  },
-                },
-              ],
-            },
-          },
-          {
             configMap: {
               defaultMode: 420,
               name: 'kube-rbac-proxy',
@@ -411,20 +293,6 @@ local controllersDeployment = {
               defaultMode: 420,
               secretName: 'machine-api-controllers-tls',
             },
-          },
-          {
-            configMap: {
-              defaultMode: 420,
-              items: [
-                {
-                  key: 'ca-bundle.crt',
-                  path: 'tls-ca-bundle.pem',
-                },
-              ],
-              name: context.cabundle.metadata.name,
-              optional: true,
-            },
-            name: 'trusted-ca',
           },
         ],
       },

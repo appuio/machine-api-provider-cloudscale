@@ -1,0 +1,43 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: app
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: c-appuio-lab-cloudscale-rma-0
+    name: app
+spec:
+  deletePolicy: Oldest
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: c-appuio-lab-cloudscale-rma-0
+      machine.openshift.io/cluster-api-machineset: app
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: c-appuio-lab-cloudscale-rma-0
+        machine.openshift.io/cluster-api-machine-role: app
+        machine.openshift.io/cluster-api-machine-type: app
+        machine.openshift.io/cluster-api-machineset: app
+    spec:
+      lifecycleHooks: {}
+      metadata:
+        labels:
+          node-role.kubernetes.io/app: ""
+          node-role.kubernetes.io/worker: ""
+      providerSpec:
+        value:
+          zone: rma1
+          baseDomain: lab-cloudscale-rma-0.appuio.cloud
+          flavor: flex-16-4
+          image: custom:rhcos-4.15
+          rootVolumeSizeGB: 100
+          antiAffinityKey: app
+          interfaces:
+          - type: Private
+            networkUUID: fd2b132d-f5d0-4024-b99f-68e5321ab4d1
+          userDataSecret:
+            name: cloudscale-user-data
+          tokenSecret:
+            name: cloudscale-rw-token

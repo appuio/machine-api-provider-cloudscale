@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -60,7 +61,7 @@ func init() {
 
 func main() {
 	var target string
-	flag.StringVar(&target, "target", "manager", "The target mode of this binary. Valid values are 'manager' and 'termination-handler'.")
+	flag.StringVar(&target, "target", "manager", "The target mode of this binary. Valid values are 'manager', 'machine-api-controllers-manager', and 'termination-handler'.")
 
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -96,6 +97,8 @@ func main() {
 		runManager(metricsAddr, probeAddr, watchNamespace, enableLeaderElection, featureGate)
 	case "termination-handler":
 		runTerminationHandler()
+	case "machine-api-controllers-manager":
+		runMachineAPIControllersManager(metricsAddr, probeAddr, watchNamespace, enableLeaderElection)
 	default:
 		setupLog.Error(nil, "invalid target", "target", target)
 		os.Exit(1)
@@ -190,4 +193,51 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 
 func runTerminationHandler() {
 	panic("not implemented")
+}
+
+func runMachineAPIControllersManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElection bool) {
+	if watchNamespace == "" {
+		setupLog.Error(nil, "namespace must be set for the machine-api-controllers manager")
+		os.Exit(1)
+	}
+
+	opts := ctrl.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		HealthProbeBindAddress:        probeAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionID:              "458f6dca.appuio.io",
+		LeaderElectionReleaseOnCancel: true,
+
+		// Limit the manager to only watch the namespace the controller is running in.
+		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+			opts.DefaultNamespaces = map[string]cache.Config{
+				watchNamespace: {},
+			}
+			return cache.New(config, opts)
+		},
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), opts)
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if err := (&controllers.MachineAPIControllersReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+
+		Namespace: watchNamespace,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "UpstreamDeployment")
+		os.Exit(1)
+	}
+
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
 }

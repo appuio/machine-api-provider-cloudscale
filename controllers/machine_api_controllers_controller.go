@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -85,6 +86,9 @@ func (r *MachineAPIControllersReconciler) Reconcile(ctx context.Context, req ctr
 			},
 		},
 	}
+	if err := controllerutil.SetControllerReference(&imageCM, &caBundleConfigMap, r.Scheme); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set controller reference: %w", err)
+	}
 	if err := r.Client.Patch(ctx, &caBundleConfigMap, client.Apply, client.FieldOwner("upstream-deployment-controller")); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply ConfigMap %q: %w", caBundleConfigMapName, err)
 	}
@@ -109,7 +113,9 @@ func (r *MachineAPIControllersReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, fmt.Errorf("expected Deployment, got %s/%s", toDeploy.APIVersion, toDeploy.Kind)
 	}
 	toDeploy.Namespace = r.Namespace
-
+	if err := controllerutil.SetControllerReference(&imageCM, &toDeploy, r.Scheme); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set controller reference: %w", err)
+	}
 	if err := r.Client.Patch(ctx, &toDeploy, client.Apply, client.FieldOwner("upstream-deployment-controller")); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply Deployment %q: %w", toDeploy.GetName(), err)
 	}

@@ -17,6 +17,8 @@ import (
 )
 
 func Test_MachineSetReconciler_Reconcile(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	scheme := runtime.NewScheme()

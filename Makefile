@@ -57,8 +57,9 @@ clean: ## Cleans up the generated resources
 	rm -rf .tmpvendor
 
 .PHONY: run
+RUN_TARGET ?= manager
 run: generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run ./main.go "-target=$(RUN_TARGET)"
 
 ###
 ### Assets

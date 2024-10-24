@@ -226,7 +226,6 @@ local controllersDeployment = {
             terminationMessagePolicy: 'File',
           },
           kubeProxyContainer('8082', 'machineset-mtrc', 8442),
-          kubeProxyContainer('8081', 'machine-mtrc', 8441),
           kubeProxyContainer('8083', 'mhc-mtrc', 8444),
         ],
         dnsPolicy: 'ClusterFirst',

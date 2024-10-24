@@ -52,7 +52,7 @@ func (r *MachineAPIControllersReconciler) Reconcile(ctx context.Context, req ctr
 
 	ij, ok := imageCM.Data[imageKey]
 	if !ok {
-		return ctrl.Result{}, fmt.Errorf("images.json key not found in ConfigMap %q", imagesConfigMapName)
+		return ctrl.Result{}, fmt.Errorf("%q key not found in ConfigMap %q", imageKey, imagesConfigMapName)
 	}
 	images := make(map[string]string)
 	if err := json.Unmarshal([]byte(ij), &images); err != nil {

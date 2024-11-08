@@ -29,12 +29,17 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 
 	ctx := context.Background()
 
+	const clusterID = "cluster-id"
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	machine := &machinev1beta1.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "app-test",
+			Labels: map[string]string{
+				machineClusterIDLabelName: clusterID,
+			},
 		},
 	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
@@ -115,7 +120,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 
 			TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 				Tags: ptr.To(cloudscale.TagMap{
-					machineNameTag: machine.Name,
+					machineNameTag:      machine.Name,
+					machineClusterIDTag: clusterID,
 				}),
 			},
 			Zone: providerSpec.Zone,
@@ -190,6 +196,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 	const zone = "rma1"
 
+	const clusterID = "cluster-id"
+
 	tcs := []struct {
 		name    string
 		apiMock func(*testing.T, *machinev1beta1.Machine, csv1beta1.CloudscaleMachineProviderSpec, *csmock.MockServerService, *csmock.MockServerGroupService)
@@ -229,7 +237,8 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 						},
 						TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 							Tags: ptr.To(cloudscale.TagMap{
-								machineNameTag: machine.Name,
+								machineNameTag:      machine.Name,
+								machineClusterIDTag: clusterID,
 							}),
 						},
 						ServerGroups: []string{newSGUUID},
@@ -266,7 +275,8 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 						},
 						TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 							Tags: ptr.To(cloudscale.TagMap{
-								machineNameTag: machine.Name,
+								machineNameTag:      machine.Name,
+								machineClusterIDTag: clusterID,
 							}),
 						},
 						ServerGroups: []string{existingUUID},
@@ -320,7 +330,8 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 						},
 						TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 							Tags: ptr.To(cloudscale.TagMap{
-								machineNameTag: machine.Name,
+								machineNameTag:      machine.Name,
+								machineClusterIDTag: clusterID,
 							}),
 						},
 						ServerGroups: []string{newSGUUID},
@@ -374,7 +385,8 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 						},
 						TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 							Tags: ptr.To(cloudscale.TagMap{
-								machineNameTag: machine.Name,
+								machineNameTag:      machine.Name,
+								machineClusterIDTag: clusterID,
 							}),
 						},
 						ServerGroups: []string{newSGUUID},
@@ -398,6 +410,9 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 			machine := &machinev1beta1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "app-test",
+					Labels: map[string]string{
+						machineClusterIDLabelName: "cluster-id",
+					},
 				},
 			}
 			providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
@@ -455,6 +470,8 @@ func Test_Actuator_Exists(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			const clusterID = "cluster-id"
+
 			ctx := context.Background()
 
 			ctrl := gomock.NewController(t)
@@ -463,6 +480,9 @@ func Test_Actuator_Exists(t *testing.T) {
 			machine := &machinev1beta1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "app-test",
+					Labels: map[string]string{
+						machineClusterIDLabelName: clusterID,
+					},
 				},
 			}
 			providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
@@ -483,7 +503,10 @@ func Test_Actuator_Exists(t *testing.T) {
 			sgs := csmock.NewMockServerGroupService(ctrl)
 			actuator := newActuator(c, ss, sgs)
 
-			ss.EXPECT().List(ctx, csTagMatcher{t: t, tags: map[string]string{machineNameTag: machine.Name}}).Return(tc.servers, nil)
+			ss.EXPECT().List(ctx, csTagMatcher{t: t, tags: map[string]string{
+				machineNameTag:      machine.Name,
+				machineClusterIDTag: clusterID,
+			}}).Return(tc.servers, nil)
 
 			exists, err := actuator.Exists(ctx, machine)
 			require.NoError(t, err)
@@ -497,12 +520,17 @@ func Test_Actuator_Update(t *testing.T) {
 
 	ctx := context.Background()
 
+	const clusterID = "cluster-id"
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	machine := &machinev1beta1.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "app-test",
+			Labels: map[string]string{
+				machineClusterIDLabelName: clusterID,
+			},
 		},
 	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
@@ -524,8 +552,11 @@ func Test_Actuator_Update(t *testing.T) {
 	actuator := newActuator(c, ss, sgs)
 
 	ss.EXPECT().List(ctx, csTagMatcher{
-		t:    t,
-		tags: map[string]string{machineNameTag: machine.Name},
+		t: t,
+		tags: map[string]string{
+			machineNameTag:      machine.Name,
+			machineClusterIDTag: clusterID,
+		},
 	}).Return([]cloudscale.Server{{
 		UUID: "machine-uuid",
 	}}, nil)
@@ -542,6 +573,8 @@ func Test_Actuator_Update(t *testing.T) {
 func Test_Actuator_Delete(t *testing.T) {
 	t.Parallel()
 
+	const clusterID = "cluster-id"
+
 	tcs := []struct {
 		name    string
 		apiMock func(*testing.T, *machinev1beta1.Machine, *csmock.MockServerService, *csmock.MockServerGroupService)
@@ -552,7 +585,10 @@ func Test_Actuator_Delete(t *testing.T) {
 			apiMock: func(t *testing.T, machine *machinev1beta1.Machine, ss *csmock.MockServerService, sgs *csmock.MockServerGroupService) {
 				ss.EXPECT().List(
 					gomock.Any(),
-					csTagMatcher{t: t, tags: map[string]string{machineNameTag: machine.Name}},
+					csTagMatcher{t: t, tags: map[string]string{
+						machineNameTag:      machine.Name,
+						machineClusterIDTag: clusterID,
+					}},
 				).Return([]cloudscale.Server{
 					{
 						UUID: "machine-uuid",
@@ -568,7 +604,10 @@ func Test_Actuator_Delete(t *testing.T) {
 			apiMock: func(t *testing.T, machine *machinev1beta1.Machine, ss *csmock.MockServerService, sgs *csmock.MockServerGroupService) {
 				ss.EXPECT().List(
 					gomock.Any(),
-					csTagMatcher{t: t, tags: map[string]string{machineNameTag: machine.Name}},
+					csTagMatcher{t: t, tags: map[string]string{
+						machineNameTag:      machine.Name,
+						machineClusterIDTag: clusterID,
+					}},
 				).Return([]cloudscale.Server{}, nil)
 			},
 		},
@@ -586,6 +625,9 @@ func Test_Actuator_Delete(t *testing.T) {
 			machine := &machinev1beta1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "app-test",
+					Labels: map[string]string{
+						machineClusterIDLabelName: clusterID,
+					},
 				},
 			}
 			providerSpec := csv1beta1.CloudscaleMachineProviderSpec{

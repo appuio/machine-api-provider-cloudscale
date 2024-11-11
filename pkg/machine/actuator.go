@@ -21,8 +21,11 @@ import (
 )
 
 const (
-	antiAffinityTag = "machine-api-provider-cloudscale_appuio_io_antiAffinityKey"
-	machineNameTag  = "machine-api-provider-cloudscale_appuio_io_name"
+	antiAffinityTag     = "machine-api-provider-cloudscale_appuio_io_antiAffinityKey"
+	machineNameTag      = "machine-api-provider-cloudscale_appuio_io_name"
+	machineClusterIDTag = "machine-api-provider-cloudscale_appuio_io_cluster_id"
+
+	machineClusterIDLabelName = "machine.openshift.io/cluster-api-cluster"
 )
 
 // Actuator is responsible for performing machine reconciliation.
@@ -82,6 +85,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		spec.Tags = make(map[string]string)
 	}
 	spec.Tags[machineNameTag] = machine.Name
+	spec.Tags[machineClusterIDTag] = mctx.clusterId
 
 	// Null is not allowed for SSH keys in the cloudscale API
 	if spec.SSHKeys == nil {
@@ -149,7 +153,7 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 	sc := a.serverClientFactory(mctx.token)
 
-	s, err := a.getServer(ctx, sc, machine)
+	s, err := a.getServer(ctx, sc, *mctx)
 
 	return s != nil, err
 }
@@ -161,7 +165,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 	sc := a.serverClientFactory(mctx.token)
 
-	s, err := a.getServer(ctx, sc, machine)
+	s, err := a.getServer(ctx, sc, *mctx)
 	if err != nil {
 		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
 	}
@@ -186,7 +190,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 	sc := a.serverClientFactory(mctx.token)
 
-	s, err := a.getServer(ctx, sc, machine)
+	s, err := a.getServer(ctx, sc, *mctx)
 	if err != nil {
 		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
 	}
@@ -203,8 +207,11 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 	return nil
 }
 
-func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, machine *machinev1beta1.Machine) (*cloudscale.Server, error) {
-	lookupKey := cloudscale.TagMap{machineNameTag: machine.Name}
+func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, machineCtx machineContext) (*cloudscale.Server, error) {
+	lookupKey := cloudscale.TagMap{
+		machineNameTag:      machineCtx.machine.Name,
+		machineClusterIDTag: machineCtx.clusterId,
+	}
 
 	ss, err := sc.List(ctx, cloudscale.WithTagFilter(lookupKey))
 	if err != nil {
@@ -214,7 +221,7 @@ func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, m
 		return nil, nil
 	}
 	if len(ss) > 1 {
-		return nil, fmt.Errorf("found multiple servers with name %q", machine.Name)
+		return nil, fmt.Errorf("found multiple servers with name %q", machineCtx.machine.Name)
 	}
 
 	return &ss[0], nil
@@ -392,15 +399,21 @@ func cloudscaleServerInterfacesFromProviderSpecInterfaces(interfaces []csv1beta1
 }
 
 type machineContext struct {
-	machine *machinev1beta1.Machine
-	spec    csv1beta1.CloudscaleMachineProviderSpec
-	token   string
+	machine   *machinev1beta1.Machine
+	clusterId string
+	spec      csv1beta1.CloudscaleMachineProviderSpec
+	token     string
 }
 
 func (a *Actuator) getMachineContext(ctx context.Context, machine *machinev1beta1.Machine) (*machineContext, error) {
 	const tokenKey = "token"
 
 	origMachine := machine.DeepCopy()
+
+	clusterId, ok := machine.Labels[machineClusterIDLabelName]
+	if !ok {
+		return nil, fmt.Errorf("cluster ID label %q not found on machine %q", machineClusterIDLabelName, machine.Name)
+	}
 
 	spec, err := csv1beta1.ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
 	if err != nil {
@@ -423,9 +436,10 @@ func (a *Actuator) getMachineContext(ctx context.Context, machine *machinev1beta
 	}
 
 	return &machineContext{
-		machine: origMachine,
-		spec:    *spec,
-		token:   token,
+		machine:   origMachine,
+		clusterId: clusterId,
+		spec:      *spec,
+		token:     token,
 	}, nil
 }
 

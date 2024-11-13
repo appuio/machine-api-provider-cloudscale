@@ -128,7 +128,6 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			ZonalResourceRequest: cloudscale.ZonalResourceRequest{
 				Zone: providerSpec.Zone,
 			},
-
 			Flavor:       providerSpec.Flavor,
 			Image:        providerSpec.Image,
 			VolumeSizeGB: providerSpec.RootVolumeSizeGB,
@@ -150,6 +149,12 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		}),
 	).DoAndReturn(cloudscaleServerFromServerRequest(func(s *cloudscale.Server) {
 		s.UUID = "created-server-uuid"
+		s.TaggedResource = cloudscale.TaggedResource{
+			Tags: cloudscale.TagMap{
+				machineNameTag:      machine.Name,
+				machineClusterIDTag: clusterID,
+			},
+		}
 	}))
 
 	require.NoError(t, actuator.Create(ctx, machine))
@@ -444,6 +449,7 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 
 func Test_Actuator_Exists(t *testing.T) {
 	t.Parallel()
+	const clusterID = "cluster-id"
 
 	tcs := []struct {
 		name    string
@@ -455,6 +461,12 @@ func Test_Actuator_Exists(t *testing.T) {
 			servers: []cloudscale.Server{
 				{
 					Name: "app-test",
+					TaggedResource: cloudscale.TaggedResource{
+						Tags: cloudscale.TagMap{
+							machineNameTag:      "app-test",
+							machineClusterIDTag: clusterID,
+						},
+					},
 				},
 			},
 			exists: true,
@@ -464,13 +476,26 @@ func Test_Actuator_Exists(t *testing.T) {
 			servers: []cloudscale.Server{},
 			exists:  false,
 		},
+		{
+			name: "machine has wrong cluster ID",
+			servers: []cloudscale.Server{
+				{
+					Name: "app-test",
+					TaggedResource: cloudscale.TaggedResource{
+						Tags: cloudscale.TagMap{
+							machineNameTag:      "app-test",
+							machineClusterIDTag: "wrong-cluster-id",
+						},
+					},
+				},
+			},
+			exists: false,
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			const clusterID = "cluster-id"
 
 			ctx := context.Background()
 
@@ -504,8 +529,7 @@ func Test_Actuator_Exists(t *testing.T) {
 			actuator := newActuator(c, ss, sgs)
 
 			ss.EXPECT().List(ctx, csTagMatcher{t: t, tags: map[string]string{
-				machineNameTag:      machine.Name,
-				machineClusterIDTag: clusterID,
+				machineNameTag: machine.Name,
 			}}).Return(tc.servers, nil)
 
 			exists, err := actuator.Exists(ctx, machine)
@@ -554,11 +578,16 @@ func Test_Actuator_Update(t *testing.T) {
 	ss.EXPECT().List(ctx, csTagMatcher{
 		t: t,
 		tags: map[string]string{
-			machineNameTag:      machine.Name,
-			machineClusterIDTag: clusterID,
+			machineNameTag: machine.Name,
 		},
 	}).Return([]cloudscale.Server{{
 		UUID: "machine-uuid",
+		TaggedResource: cloudscale.TaggedResource{
+			Tags: cloudscale.TagMap{
+				machineNameTag:      machine.Name,
+				machineClusterIDTag: clusterID,
+			},
+		},
 	}}, nil)
 
 	require.NoError(t, actuator.Update(ctx, machine))
@@ -586,12 +615,17 @@ func Test_Actuator_Delete(t *testing.T) {
 				ss.EXPECT().List(
 					gomock.Any(),
 					csTagMatcher{t: t, tags: map[string]string{
-						machineNameTag:      machine.Name,
-						machineClusterIDTag: clusterID,
+						machineNameTag: machine.Name,
 					}},
 				).Return([]cloudscale.Server{
 					{
 						UUID: "machine-uuid",
+						TaggedResource: cloudscale.TaggedResource{
+							Tags: cloudscale.TagMap{
+								machineNameTag:      machine.Name,
+								machineClusterIDTag: clusterID,
+							},
+						},
 					},
 				}, nil)
 				ss.EXPECT().Delete(
@@ -605,8 +639,7 @@ func Test_Actuator_Delete(t *testing.T) {
 				ss.EXPECT().List(
 					gomock.Any(),
 					csTagMatcher{t: t, tags: map[string]string{
-						machineNameTag:      machine.Name,
-						machineClusterIDTag: clusterID,
+						machineNameTag: machine.Name,
 					}},
 				).Return([]cloudscale.Server{}, nil)
 			},

@@ -209,14 +209,21 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 
 func (a *Actuator) getServer(ctx context.Context, sc cloudscale.ServerService, machineCtx machineContext) (*cloudscale.Server, error) {
 	lookupKey := cloudscale.TagMap{
-		machineNameTag:      machineCtx.machine.Name,
-		machineClusterIDTag: machineCtx.clusterId,
+		machineNameTag: machineCtx.machine.Name,
 	}
 
-	ss, err := sc.List(ctx, cloudscale.WithTagFilter(lookupKey))
+	ssa, err := sc.List(ctx, cloudscale.WithTagFilter(lookupKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
+	// The cloudscale API does not support filtering by multiple tags, so we have to filter manually
+	ss := make([]cloudscale.Server, 0, len(ssa))
+	for _, s := range ssa {
+		if tk := s.TaggedResource.Tags[machineClusterIDTag]; tk != "" && tk == machineCtx.clusterId {
+			ss = append(ss, s)
+		}
+	}
+
 	if len(ss) == 0 {
 		return nil, nil
 	}

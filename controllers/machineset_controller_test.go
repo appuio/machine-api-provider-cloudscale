@@ -14,6 +14,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	csv1beta1 "github.com/appuio/machine-api-provider-cloudscale/api/cloudscale/provider/v1beta1"
 )
 
 func Test_MachineSetReconciler_Reconcile(t *testing.T) {
@@ -37,7 +39,12 @@ func Test_MachineSetReconciler_Reconcile(t *testing.T) {
 		Spec: machinev1beta1.MachineSetSpec{},
 	}
 
-	setFlavorOnMachineSet(ms, "plus-4-2")
+	providerData := csv1beta1.CloudscaleMachineProviderSpec{
+		Flavor:           "plus-4-2",
+		RootVolumeSizeGB: 50,
+	}
+
+	setMachineSetProviderData(ms, &providerData)
 
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -57,10 +64,11 @@ func Test_MachineSetReconciler_Reconcile(t *testing.T) {
 	assert.Equal(t, "4096", updated.Annotations[memoryKey])
 	assert.Equal(t, "0", updated.Annotations[gpuKey])
 	assert.Equal(t, "a=a,b=b,kubernetes.io/arch=amd64", updated.Annotations[labelsKey])
+	assert.Equal(t, "50Gi", updated.Annotations[diskKey])
 }
 
-func setFlavorOnMachineSet(machine *machinev1beta1.MachineSet, flavor string) {
+func setMachineSetProviderData(machine *machinev1beta1.MachineSet, providerData *csv1beta1.CloudscaleMachineProviderSpec) {
 	machine.Spec.Template.Spec.ProviderSpec.Value = &runtime.RawExtension{
-		Raw: []byte(fmt.Sprintf(`{"flavor": "%s"}`, flavor)),
+		Raw: []byte(fmt.Sprintf(`{"flavor": "%s", "rootVolumeSizeGB": %d}`, providerData.Flavor, providerData.RootVolumeSizeGB)),
 	}
 }

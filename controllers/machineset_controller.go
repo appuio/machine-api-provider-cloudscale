@@ -31,6 +31,7 @@ const (
 	memoryKey = "machine.openshift.io/memoryMb"
 	gpuKey    = "machine.openshift.io/GPU"
 	labelsKey = "capacity.cluster-autoscaler.kubernetes.io/labels"
+	diskKey   = "capacity.cluster-autoscaler.kubernetes.io/ephemeral-disk"
 
 	gpuKeyValue = "0"
 	arch        = "kubernetes.io/arch=amd64"
@@ -67,9 +68,15 @@ func (r *MachineSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to parse flavor %q: %w", spec.Flavor, err)
 	}
 
+	if spec.RootVolumeSizeGB == 0 {
+		return ctrl.Result{}, fmt.Errorf("root volume size is not set")
+	}
+
 	machineSet.Annotations[cpuKey] = strconv.Itoa(flavor.CPU)
 	machineSet.Annotations[memoryKey] = strconv.Itoa(flavor.MemGB * 1024)
 	machineSet.Annotations[gpuKey] = gpuKeyValue
+	// According to https://www.cloudscale.ch/en/api/v1#create-a-server GB here means GiB
+	machineSet.Annotations[diskKey] = fmt.Sprintf("%dGi", spec.RootVolumeSizeGB)
 
 	// We guarantee that any existing labels provided via the capacity annotations are preserved.
 	// See https://github.com/kubernetes/autoscaler/pull/5382 and https://github.com/kubernetes/autoscaler/pull/5697

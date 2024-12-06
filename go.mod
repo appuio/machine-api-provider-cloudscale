@@ -7,9 +7,9 @@ toolchain go1.23.3
 require (
 	github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.0.1
 	github.com/google/go-jsonnet v0.20.0
-	github.com/openshift/api v0.0.0-20240924155631-232984653385
+	github.com/openshift/api v0.0.0-20241118215836-09b63162bb15
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
-	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
+	github.com/openshift/machine-api-operator v0.2.1-0.20241206100350-317232bb692b
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.5.0
 	k8s.io/api v0.31.2
@@ -79,7 +79,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.4 // indirect
+	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect

@@ -10,7 +10,7 @@ require (
 	github.com/openshift/api v0.0.0-20240924155631-232984653385
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
 	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 	k8s.io/api v0.31.4
 	k8s.io/apimachinery v0.31.4

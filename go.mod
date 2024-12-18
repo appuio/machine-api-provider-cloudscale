@@ -7,9 +7,9 @@ toolchain go1.23.4
 require (
 	github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.0.1
 	github.com/google/go-jsonnet v0.20.0
-	github.com/openshift/api v0.0.0-20240924155631-232984653385
-	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
-	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
+	github.com/openshift/api v0.0.0-20241210144725-fa836ae33dad
+	github.com/openshift/library-go v0.0.0-20241210151741-8d0b2ce3fb30
+	github.com/openshift/machine-api-operator v0.2.1-0.20241218162302-ea1636dc8909
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 	k8s.io/api v0.31.4
@@ -74,11 +74,11 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v1.34.2 // indirect
-	github.com/openshift/client-go v0.0.0-20240918182115-6a8ead8397fd // indirect
+	github.com/openshift/client-go v0.0.0-20241203091221-452dfb8fa071 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.4 // indirect
+	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect

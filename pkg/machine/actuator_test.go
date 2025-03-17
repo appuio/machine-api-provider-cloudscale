@@ -162,7 +162,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 	updatedMachine := &machinev1beta1.Machine{}
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(machine), updatedMachine))
 	if assert.NotNil(t, updatedMachine.Spec.ProviderID) {
-		assert.Equal(t, "cloudscale:///created-server-uuid", *updatedMachine.Spec.ProviderID)
+		assert.Equal(t, "cloudscale://created-server-uuid", *updatedMachine.Spec.ProviderID)
 	}
 
 	// Labels are just for show with kubectl get
@@ -595,7 +595,7 @@ func Test_Actuator_Update(t *testing.T) {
 	var updatedMachine machinev1beta1.Machine
 	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(machine), &updatedMachine))
 	if assert.NotNil(t, updatedMachine.Spec.ProviderID) {
-		assert.Equal(t, "cloudscale:///machine-uuid", *updatedMachine.Spec.ProviderID)
+		assert.Equal(t, "cloudscale://machine-uuid", *updatedMachine.Spec.ProviderID)
 	}
 }
 

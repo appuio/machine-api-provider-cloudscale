@@ -359,7 +359,7 @@ func machineAddressesFromCloudscaleServer(s cloudscale.Server) []corev1.NodeAddr
 }
 
 func formatProviderID(uuid string) string {
-	return fmt.Sprintf("cloudscale:///%s", uuid)
+	return fmt.Sprintf("cloudscale://%s", uuid)
 }
 
 func providerStatusFromCloudscaleServer(s cloudscale.Server) csv1beta1.CloudscaleMachineProviderStatus {

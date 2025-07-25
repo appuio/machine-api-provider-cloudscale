@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.0.1
 	github.com/google/go-jsonnet v0.20.0
-	github.com/openshift/api v0.0.0-20240924155631-232984653385
+	github.com/openshift/api 92b1455121e1
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
 	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
 	github.com/stretchr/testify v1.10.0

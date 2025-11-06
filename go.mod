@@ -2,7 +2,7 @@ module github.com/appuio/machine-api-provider-cloudscale
 
 go 1.23.0
 
-toolchain go1.24.1
+toolchain go1.25.4
 
 require (
 	github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.0.1

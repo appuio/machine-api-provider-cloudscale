@@ -13,6 +13,7 @@ import (
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -477,7 +478,23 @@ func (a *Actuator) loadAndRenderUserDataSecret(ctx context.Context, mctx *machin
 		data[k] = string(v)
 	}
 
-	jvm, err := jsonnetVMWithContext(mctx.machine, data)
+	var userDataSecrets corev1.SecretList
+	if mctx.spec.UserDataSecretSelector != nil {
+		sel, err := metav1.LabelSelectorAsSelector(mctx.spec.UserDataSecretSelector)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse UserDataSecretSelector: %w", err)
+		}
+		if err := a.k8sClient.List(
+			ctx,
+			&userDataSecrets,
+			client.InNamespace(mctx.machine.Namespace),
+			client.MatchingLabelsSelector{Selector: sel},
+		); err != nil {
+			return "", fmt.Errorf("failed to list secrets in namespace %q: %w", mctx.machine.Namespace, err)
+		}
+	}
+
+	jvm, err := jsonnetVMWithContext(mctx.machine, data, userDataSecrets)
 	if err != nil {
 		return "", fmt.Errorf("userData: failed to create jsonnet VM: %w", err)
 	}
@@ -494,10 +511,11 @@ func (a *Actuator) loadAndRenderUserDataSecret(ctx context.Context, mctx *machin
 	return compacted.String(), nil
 }
 
-func jsonnetVMWithContext(machine *machinev1beta1.Machine, data map[string]string) (*jsonnet.VM, error) {
+func jsonnetVMWithContext(machine *machinev1beta1.Machine, data map[string]string, userDataSecrets corev1.SecretList) (*jsonnet.VM, error) {
 	jcr, err := json.Marshal(map[string]any{
 		"machine": machine,
 		"data":    data,
+		"secrets": userDataSecrets.Items,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal jsonnet context: %w", err)

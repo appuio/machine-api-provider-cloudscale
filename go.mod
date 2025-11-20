@@ -8,7 +8,7 @@ require (
 	github.com/google/go-jsonnet v0.21.0
 	github.com/openshift/api v0.0.0-20251120040117-916c7003ed78
 	github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68
-	github.com/openshift/machine-api-operator v0.2.1-0.20241009125928-52a965a42fac
+	github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	k8s.io/api v0.34.2
@@ -32,7 +32,6 @@ require (
 	github.com/chai2010/gettext-go v1.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
-	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -107,7 +106,6 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
-	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect

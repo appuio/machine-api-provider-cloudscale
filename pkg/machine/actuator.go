@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
+	"github.com/cloudscale-ch/cloudscale-go-sdk/v6"
 	"github.com/google/go-jsonnet"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"

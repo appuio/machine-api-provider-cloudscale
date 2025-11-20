@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/appuio/machine-api-provider-cloudscale/pkg/machine/csmock"
-	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
+	"github.com/cloudscale-ch/cloudscale-go-sdk/v6"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/stretchr/testify/assert"

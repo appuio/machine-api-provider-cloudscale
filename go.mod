@@ -4,7 +4,6 @@ go 1.25
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.1.0
 	github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.0
 	github.com/google/go-jsonnet v0.21.0
 	github.com/openshift/api v0.0.0-20251120040117-916c7003ed78

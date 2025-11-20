@@ -24,7 +24,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/cloudscale-ch/cloudscale-go-sdk/v5"
+	"github.com/cloudscale-ch/cloudscale-go-sdk/v6"
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"

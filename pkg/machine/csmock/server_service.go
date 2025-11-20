@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	backoff "github.com/cenkalti/backoff/v5"
 	cloudscale "github.com/cloudscale-ch/cloudscale-go-sdk/v5"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -57,32 +58,32 @@ func (mr *MockServerServiceMockRecorder) Create(ctx, createRequest any) *gomock.
 }
 
 // Delete mocks base method.
-func (m *MockServerService) Delete(ctx context.Context, serverID string) error {
+func (m *MockServerService) Delete(ctx context.Context, resourceID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, serverID)
+	ret := m.ctrl.Call(m, "Delete", ctx, resourceID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockServerServiceMockRecorder) Delete(ctx, serverID any) *gomock.Call {
+func (mr *MockServerServiceMockRecorder) Delete(ctx, resourceID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockServerService)(nil).Delete), ctx, serverID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockServerService)(nil).Delete), ctx, resourceID)
 }
 
 // Get mocks base method.
-func (m *MockServerService) Get(ctx context.Context, serverID string) (*cloudscale.Server, error) {
+func (m *MockServerService) Get(ctx context.Context, resourceID string) (*cloudscale.Server, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, serverID)
+	ret := m.ctrl.Call(m, "Get", ctx, resourceID)
 	ret0, _ := ret[0].(*cloudscale.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockServerServiceMockRecorder) Get(ctx, serverID any) *gomock.Call {
+func (mr *MockServerServiceMockRecorder) Get(ctx, resourceID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockServerService)(nil).Get), ctx, serverID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockServerService)(nil).Get), ctx, resourceID)
 }
 
 // List mocks base method.
@@ -148,15 +149,35 @@ func (mr *MockServerServiceMockRecorder) Stop(ctx, serverID any) *gomock.Call {
 }
 
 // Update mocks base method.
-func (m *MockServerService) Update(ctx context.Context, serverID string, updateRequest *cloudscale.ServerUpdateRequest) error {
+func (m *MockServerService) Update(ctx context.Context, resourceID string, updateRequest *cloudscale.ServerUpdateRequest) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, serverID, updateRequest)
+	ret := m.ctrl.Call(m, "Update", ctx, resourceID, updateRequest)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockServerServiceMockRecorder) Update(ctx, serverID, updateRequest any) *gomock.Call {
+func (mr *MockServerServiceMockRecorder) Update(ctx, resourceID, updateRequest any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockServerService)(nil).Update), ctx, serverID, updateRequest)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockServerService)(nil).Update), ctx, resourceID, updateRequest)
+}
+
+// WaitFor mocks base method.
+func (m *MockServerService) WaitFor(ctx context.Context, resourceID string, condition func(*cloudscale.Server) (bool, error), opts ...backoff.RetryOption) (*cloudscale.Server, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, resourceID, condition}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "WaitFor", varargs...)
+	ret0, _ := ret[0].(*cloudscale.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitFor indicates an expected call of WaitFor.
+func (mr *MockServerServiceMockRecorder) WaitFor(ctx, resourceID, condition any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, resourceID, condition}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitFor", reflect.TypeOf((*MockServerService)(nil).WaitFor), varargs...)
 }

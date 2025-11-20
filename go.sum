@@ -86,6 +86,7 @@ github.com/ckaznocha/intrange v0.3.0 h1:VqnxtK32pxgkhJgYQEeOArVidIPg+ahLP7WBOXZd
 github.com/ckaznocha/intrange v0.3.0/go.mod h1:+I/o2d2A1FBHgGELbGxzIcyd3/9l9DuwjM8FsbSS3Lo=
 github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.1.0 h1:5JfDWIPR7vZPynkQHi042P5F+dwq6Vk28TkoPj6U+ts=
 github.com/cloudscale-ch/cloudscale-go-sdk/v5 v5.1.0/go.mod h1:diuqAehpkhH5p9ACknlgw7+HQtHuZI7ZRy+JNXQaOW8=
+github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.0/go.mod h1:agOnbZIZJUfW4V/4s5wYX7IoXoixGxXzQhW30+fpGPU=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=

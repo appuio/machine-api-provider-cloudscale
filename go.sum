@@ -371,8 +371,8 @@ github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-202510290
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20251029084908-344babe6a957/go.mod h1:TBlORAAtNZ/Tl86pO7GjNXKsH/g0QAW5GnvYstdOhYI=
 github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68 h1:urrCRGujwOBjiK5lyNVKeLd36IQra+yQykw4gsfvtkw=
 github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68/go.mod h1:ErDfiIrPHH+menTP/B4LKd0nxFDdvCbTamAc6SWMIh8=
-github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c h1:EkFeH2kbOEnBY6dDP3ZyD+hFeFk0kCYl4IpL+S/OBKw=
-github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c/go.mod h1:+XKHy9Qi5P5kQ+oSknV5JdWtLnUxqWiNInRYYA3uqkI=
+github.com/openshift/machine-api-operator v0.2.1-0.20251121134325-1d78f2ebcae5 h1:TgkkGQc2ZCjTFVVmii8o72XEs4lDOpG2aKhxkSCJuqw=
+github.com/openshift/machine-api-operator v0.2.1-0.20251121134325-1d78f2ebcae5/go.mod h1:OStLZl5CE/RQyGzPBA8Cro+Kmck2G2n4c1rw6TpYT5w=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
 github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=

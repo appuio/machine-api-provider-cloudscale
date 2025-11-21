@@ -35,6 +35,11 @@ func (in *CloudscaleMachineProviderSpec) DeepCopyInto(out *CloudscaleMachineProv
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.UserDataSecretSelector != nil {
+		in, out := &in.UserDataSecretSelector, &out.UserDataSecretSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.TokenSecret != nil {
 		in, out := &in.TokenSecret, &out.TokenSecret
 		*out = new(v1.LocalObjectReference)

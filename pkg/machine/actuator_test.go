@@ -50,7 +50,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			},
 		},
 		Data: map[string][]byte{
-			"userData": []byte("{}"),
+			"userData": []byte("{\"ignition\": {}}"),
 		},
 	}
 	unrelatedSecret := &corev1.Secret{
@@ -103,7 +103,16 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		},
 		Data: map[string][]byte{
 			"ignitionCA": []byte("CADATA"),
-			"userData":   []byte("{ca: std.extVar('context').data.ignitionCA, udsecrets: std.map(function(s) [s.metadata.name,s.data],std.extVar('context').secrets)}"),
+			"userData": []byte(`
+{
+	ca: std.extVar('context').data.ignitionCA,
+	udsecrets: std.map(function(s) [
+		s.metadata.name,
+		std.parseJson(std.decodeUTF8(std.base64DecodeBytes(s.data.userData))),
+	],
+	std.extVar('context').secrets)
+}
+`),
 		},
 	}
 
@@ -167,7 +176,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			SSHKeys:      []string{},
 			UseIPV6:      providerSpec.UseIPV6,
 			ServerGroups: []string{"created-server-group-uuid"},
-			UserData:     "{\"ca\":\"CADATA\",\"udsecrets\":[[\"user-data-managed\",{\"userData\":\"e30=\"}]]}",
+			UserData:     "{\"ca\":\"CADATA\",\"udsecrets\":[[\"user-data-managed\",{\"ignition\":{}}]]}",
 		}),
 	).DoAndReturn(cloudscaleServerFromServerRequest(func(s *cloudscale.Server) {
 		s.UUID = "created-server-uuid"

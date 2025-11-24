@@ -11,6 +11,8 @@ MAKEFLAGS += --no-builtin-variables
 PROJECT_ROOT_DIR = .
 include Makefile.vars.mk
 
+JSONNET_FILES   ?= $(shell find . -type f -not -path './vendor/*' \( -name '*.*jsonnet' -or -name '*.libsonnet' \))
+
 .PHONY: help
 help: ## Show this help
 	@grep -E -h '\s##\s' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -37,6 +39,7 @@ generate: ## Generate e.g. CRD, RBAC etc.
 .PHONY: fmt
 fmt: ## Run go fmt against code
 	go fmt ./...
+	go tool github.com/google/go-jsonnet/cmd/jsonnetfmt -i -- $(JSONNET_FILES)
 
 .PHONY: vet
 vet: ## Run go vet against code

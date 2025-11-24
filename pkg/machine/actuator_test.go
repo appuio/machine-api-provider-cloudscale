@@ -42,8 +42,30 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			},
 		},
 	}
+	appUserDataSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "user-data-managed",
+			Labels: map[string]string{
+				"test.com/user-data-secret": "",
+			},
+		},
+		Data: map[string][]byte{
+			"userData": []byte("{\"ignition\": {}}"),
+		},
+	}
+	unrelatedSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "unrelated-secret",
+		},
+		Data: map[string][]byte{
+			"foo": []byte("bar"),
+		},
+	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
-		UserDataSecret:   &corev1.LocalObjectReference{Name: "app-user-data"},
+		UserDataSecret: &corev1.LocalObjectReference{Name: "app-user-data"},
+		UserDataSecretSelector: &metav1.LabelSelector{
+			MatchLabels: appUserDataSecret.Labels,
+		},
 		TokenSecret:      &corev1.LocalObjectReference{Name: "cloudscale-token"},
 		BaseDomain:       "cluster.example.com",
 		Zone:             "rma1",
@@ -81,11 +103,20 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		},
 		Data: map[string][]byte{
 			"ignitionCA": []byte("CADATA"),
-			"userData":   []byte("{ca: std.extVar('context').data.ignitionCA}"),
+			"userData": []byte(`
+{
+	ca: std.extVar('context').data.ignitionCA,
+	udsecrets: std.map(function(s) [
+		s.metadata.name,
+		std.parseJson(std.decodeUTF8(std.base64DecodeBytes(s.data.userData))),
+	],
+	std.extVar('context').secrets)
+}
+`),
 		},
 	}
 
-	c := newFakeClient(t, machine, tokenSecret, userDataSecret)
+	c := newFakeClient(t, machine, tokenSecret, userDataSecret, appUserDataSecret, unrelatedSecret)
 	ss := csmock.NewMockServerService(ctrl)
 	sgs := csmock.NewMockServerGroupService(ctrl)
 	actuator := newActuator(c, ss, sgs)
@@ -145,7 +176,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			SSHKeys:      []string{},
 			UseIPV6:      providerSpec.UseIPV6,
 			ServerGroups: []string{"created-server-group-uuid"},
-			UserData:     "{\"ca\":\"CADATA\"}",
+			UserData:     "{\"ca\":\"CADATA\",\"udsecrets\":[[\"user-data-managed\",{\"ignition\":{}}]]}",
 		}),
 	).DoAndReturn(cloudscaleServerFromServerRequest(func(s *cloudscale.Server) {
 		s.UUID = "created-server-uuid"

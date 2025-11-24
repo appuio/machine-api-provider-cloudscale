@@ -29,8 +29,17 @@ type CloudscaleMachineProviderSpec struct {
 	// The Jsonnet template has access to the following variables:
 	// - std.extVar('context').machine: the Machine object. The name can be accessed via std.extVar('context').machine.metadata.name for example.
 	// - std.extVar('context').data: all keys from the UserDataSecret. For example, std.extVar('context').data.foo will access the value of the key foo.
+	// - std.extVar('context').secrets: all secrets matching UserDataSecretSelector. For example, std.extVar('context').secrets[0].metadata.name will access the name of the first secret.
+	// Also see UserDataSecretSelector.
 	// +optional
 	UserDataSecret *corev1.LocalObjectReference `json:"userDataSecret,omitempty"`
+	// UserDataSecretSelector allows passing secrets with the matching selector into the user data Jsonnet context.
+	// Only secrets in the same namespace as the controller are considered.
+	// +optional
+	// `null` means no secrets are passed.
+	// And empty selector means all secrets in the namespace are passed.
+	UserDataSecretSelector *metav1.LabelSelector `json:"userDataSecretSelector,omitempty"`
+
 	// TokenSecret is a reference to the secret with the cloudscale API token.
 	// The secret must contain a key named token.
 	// If no token is provided, the operator will try to use the default token from CLOUDSCALE_API_TOKEN.

@@ -6,9 +6,9 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.0
 	github.com/google/go-jsonnet v0.21.0
-	github.com/openshift/api v0.0.0-20251120040117-916c7003ed78
+	github.com/openshift/api v0.0.0-20251120220512-cb382c9eaf42
 	github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68
-	github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c
+	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	k8s.io/api v0.34.2

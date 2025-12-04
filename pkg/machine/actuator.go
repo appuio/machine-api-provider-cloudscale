@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v6"
 	"github.com/google/go-jsonnet"
@@ -14,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,6 +43,7 @@ type Actuator struct {
 
 	serverClientFactory      func(token string) cloudscale.ServerService
 	serverGroupClientFactory func(token string) cloudscale.ServerGroupService
+	volumeClientFactory      func(token string) cloudscale.VolumeService
 }
 
 // ActuatorParams holds parameter information for Actuator.
@@ -51,6 +54,7 @@ type ActuatorParams struct {
 
 	ServerClientFactory      func(token string) cloudscale.ServerService
 	ServerGroupClientFactory func(token string) cloudscale.ServerGroupService
+	VolumeClientFactory      func(token string) cloudscale.VolumeService
 }
 
 // NewActuator returns an actuator.
@@ -62,6 +66,7 @@ func NewActuator(params ActuatorParams) *Actuator {
 
 		serverClientFactory:      params.ServerClientFactory,
 		serverGroupClientFactory: params.ServerGroupClientFactory,
+		volumeClientFactory:      params.VolumeClientFactory,
 	}
 }
 
@@ -144,7 +149,43 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to patch machine %q: %w", machine.Name, err)
 	}
 
+	// Tag the RootVolume if tags are set
+	if spec.RootVolumeTags != nil {
+		backoff := wait.Backoff{
+			Duration: 1 * time.Second,
+			Factor:   2.0,
+			Jitter:   0.1,
+			Steps:    10,
+			Cap:      5 * time.Minute,
+		}
+		vc := a.volumeClientFactory(mctx.token)
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			s, err = sc.Get(ctx, s.UUID)
+			rootVolumeUUID := s.Volumes[0].UUID
+			if success := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); success {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			reqRaw, _ := json.Marshal(req)
+			return fmt.Errorf("failed to tag root volume of machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
+		}
+	}
+
 	return nil
+}
+
+func tagRootVolume(ctx context.Context, vc cloudscale.VolumeService, uuid string, tags map[string]string) bool {
+	req := &cloudscale.VolumeRequest{
+		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+			Tags: ptr.To(cloudscale.TagMap(tags)),
+		},
+	}
+	if err := vc.Update(ctx, uuid, req); err != nil {
+		return false
+	}
+	return true
 }
 
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {

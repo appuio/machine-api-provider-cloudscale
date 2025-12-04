@@ -180,6 +180,9 @@ func runManager(metricsAddr, probeAddr, watchNamespace string, enableLeaderElect
 		ServerGroupClientFactory: func(token string) cloudscale.ServerGroupService {
 			return newClient(token).ServerGroups
 		},
+		VolumeClientFactory: func(token string) cloudscale.VolumeService {
+			return newClient(token).Volumes
+		},
 	})
 
 	if err := capimachine.AddWithActuator(mgr, machineActuator, featureGate); err != nil {

@@ -171,6 +171,11 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 				lastErr = fmt.Errorf("root volume UUID is empty for server %q", s.UUID)
 				return false, nil
 			}
+			// ensure volume is queryable before tagging
+			if _, err := vc.Get(ctx, rootVolumeUUID); err != nil {
+				lastErr = fmt.Errorf("failed to get volume for server %q", s.UUID)
+				return false, nil
+			}
 			return true, nil
 		})
 

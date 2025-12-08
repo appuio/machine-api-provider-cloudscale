@@ -77,7 +77,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		Flavor:           "flex-16-4",
 		Image:            "custom:rhcos-4.15",
 		RootVolumeSizeGB: 100,
-		RootVolumeTags: rootVolumeTags,
+		RootVolumeTags:   rootVolumeTags,
 		Interfaces: []csv1beta1.Interface{
 			{
 				Type:        csv1beta1.InterfaceTypePrivate,

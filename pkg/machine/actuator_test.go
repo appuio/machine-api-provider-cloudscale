@@ -61,6 +61,9 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			"foo": []byte("bar"),
 		},
 	}
+	rootVolumeTags := map[string]string{
+		"volume-purpose": "root",
+	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
 		UserDataSecret: &corev1.LocalObjectReference{Name: "app-user-data"},
 		UserDataSecretSelector: &metav1.LabelSelector{
@@ -73,6 +76,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		Flavor:           "flex-16-4",
 		Image:            "custom:rhcos-4.15",
 		RootVolumeSizeGB: 100,
+		RootVolumeTags: rootVolumeTags,
 		Interfaces: []csv1beta1.Interface{
 			{
 				Type:        csv1beta1.InterfaceTypePrivate,
@@ -188,6 +192,19 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			},
 		}
 	}))
+
+	ss.EXPECT().Get(gomock.Any(), "created-server-uuid").Return(&cloudscale.Server{
+		UUID: "created-server-uuid",
+		Volumes: []cloudscale.VolumeStub{
+			{UUID: "root-volume-uuid"},
+		},
+	}, nil)
+
+	vs.EXPECT().Update(gomock.Any(), "root-volume-uuid", newDeepEqualMatcher(t, &cloudscale.VolumeRequest{
+		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+			Tags: ptr.To(cloudscale.TagMap(rootVolumeTags)),
+		},
+	})).Return(nil)
 
 	require.NoError(t, actuator.Create(ctx, machine))
 

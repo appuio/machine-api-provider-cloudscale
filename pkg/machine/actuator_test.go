@@ -119,7 +119,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 	c := newFakeClient(t, machine, tokenSecret, userDataSecret, appUserDataSecret, unrelatedSecret)
 	ss := csmock.NewMockServerService(ctrl)
 	sgs := csmock.NewMockServerGroupService(ctrl)
-	actuator := newActuator(c, ss, sgs)
+	vs := csmock.NewMockVolumeService(ctrl)
+	actuator := newActuator(c, ss, sgs, vs)
 
 	sgs.EXPECT().List(
 		gomock.Any(),
@@ -469,7 +470,7 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			tc.apiMock(t, machine, providerSpec, ss, sgs)
 
@@ -557,7 +558,7 @@ func Test_Actuator_Exists(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			ss.EXPECT().List(ctx, csTagMatcher{t: t, tags: map[string]string{
 				machineNameTag: machine.Name,
@@ -604,7 +605,7 @@ func Test_Actuator_Update(t *testing.T) {
 	c := newFakeClient(t, machine, tokenSecret)
 	ss := csmock.NewMockServerService(ctrl)
 	sgs := csmock.NewMockServerGroupService(ctrl)
-	actuator := newActuator(c, ss, sgs)
+	actuator := newActuator(c, ss, sgs, nil)
 
 	ss.EXPECT().List(ctx, csTagMatcher{
 		t: t,
@@ -710,7 +711,7 @@ func Test_Actuator_Delete(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			tc.apiMock(t, machine, ss, sgs)
 
@@ -841,7 +842,7 @@ func setProviderSpecOnMachine(t *testing.T, machine *machinev1beta1.Machine, pro
 	machine.Spec.ProviderSpec.Value = ext
 }
 
-func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.ServerGroupService) *Actuator {
+func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.ServerGroupService, vs cloudscale.VolumeService) *Actuator {
 	return NewActuator(ActuatorParams{
 		K8sClient:                 c,
 		DefaultCloudscaleAPIToken: "",
@@ -850,6 +851,9 @@ func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.Se
 		},
 		ServerGroupClientFactory: func(token string) cloudscale.ServerGroupService {
 			return sgs
+		},
+		VolumeClientFactory: func(token string) cloudscale.VolumeService {
+			return vs
 		},
 	})
 }

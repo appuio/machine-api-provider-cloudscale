@@ -162,6 +162,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		vc := a.volumeClientFactory(mctx.token)
 
 		var lastErr error
+		var rootVolumeUUID string
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 			// query server to check if root volume UUID has been populated
 			s, err = sc.Get(ctx, s.UUID)
@@ -173,23 +174,24 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 				lastErr = fmt.Errorf("no volumes found for server %q", s.UUID)
 				return false, nil
 			}
-			rootVolumeUUID := s.Volumes[0].UUID
+			rootVolumeUUID = s.Volumes[0].UUID
 			if rootVolumeUUID == "" {
 				lastErr = fmt.Errorf("root volume UUID is empty for server %q", s.UUID)
 				return false, nil
 			}
-			if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
-				lastErr = err
-				return false, nil
-			}
 			return true, nil
 		})
+
 		if err != nil {
-			reqRaw, _ := json.Marshal(req)
 			if lastErr == nil {
 				lastErr = err
 			}
-			return fmt.Errorf("failed to tag root volume of machine %q: %w (last error: %v), req:%+v", machine.Name, err, lastErr, string(reqRaw))
+			return fmt.Errorf("failed to get root volume UUID for machine %q: %w (last error: %v)", machine.Name, err, lastErr)
+		}
+
+		if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
+			reqRaw, _ := json.Marshal(req)
+			return fmt.Errorf("failed to tag root volume of machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
 		}
 	}
 

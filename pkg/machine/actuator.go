@@ -150,6 +150,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	// Tag the RootVolume if tags are set
+	// It can take some time for CloudScale to populate the root volume UUID
 	if spec.RootVolumeTags != nil {
 		backoff := wait.Backoff{
 			Duration: 1 * time.Second,
@@ -160,8 +161,12 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		}
 		vc := a.volumeClientFactory(mctx.token)
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			// query server to check if root volume UUID has been populated
 			s, err = sc.Get(ctx, s.UUID)
 			rootVolumeUUID := s.Volumes[0].UUID
+			if rootVolumeUUID == "" {
+				return false, nil
+			}
 			if success := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); success {
 				return true, nil
 			}

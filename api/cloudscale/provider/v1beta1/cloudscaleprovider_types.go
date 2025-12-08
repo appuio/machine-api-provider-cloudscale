@@ -71,6 +71,8 @@ type CloudscaleMachineProviderSpec struct {
 	Image string `json:"image"`
 	// RootVolumeSizeGB is the size of the root volume in GB.
 	RootVolumeSizeGB int `json:"rootVolumeSizeGB"`
+	// RootVolumeTags is a map of tags to apply to the root volume.
+	RootVolumeTags map[string]string `json:"rootVolumeTags"`
 	// SSHKeys is a list of SSH keys to add to the machine.
 	SSHKeys []string `json:"sshKeys"`
 	// UseIPV6 is a flag to enable IPv6 on the machine.

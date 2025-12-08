@@ -63,6 +63,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 	}
 	rootVolumeTags := map[string]string{
 		"volume-purpose": "root",
+		"cluster-id":     clusterID,
 	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
 		UserDataSecret: &corev1.LocalObjectReference{Name: "app-user-data"},

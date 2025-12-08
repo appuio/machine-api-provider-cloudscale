@@ -141,14 +141,6 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	l.Info("Created machine", "machine", machine.Name, "uuid", s.UUID, "server", s)
 
-	if err := updateMachineFromCloudscaleServer(machine, *s); err != nil {
-		return fmt.Errorf("failed to update machine %q from cloudscale API response: %w", machine.Name, err)
-	}
-
-	if err := a.patchMachine(ctx, mctx.machine, machine); err != nil {
-		return fmt.Errorf("failed to patch machine %q: %w", machine.Name, err)
-	}
-
 	// Tag the RootVolume if tags are set
 	// It can take some time for CloudScale to populate the root volume UUID
 	if spec.RootVolumeTags != nil {
@@ -193,6 +185,16 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 			reqRaw, _ := json.Marshal(req)
 			return fmt.Errorf("failed to tag root volume of machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
 		}
+
+		l.Info("Tagged volume", "volume", rootVolumeUUID, "machine", machine.Name, "uuid", s.UUID, "server", s)
+	}
+
+	if err := updateMachineFromCloudscaleServer(machine, *s); err != nil {
+		return fmt.Errorf("failed to update machine %q from cloudscale API response: %w", machine.Name, err)
+	}
+
+	if err := a.patchMachine(ctx, mctx.machine, machine); err != nil {
+		return fmt.Errorf("failed to patch machine %q: %w", machine.Name, err)
 	}
 
 	return nil

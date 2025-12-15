@@ -157,7 +157,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		var rootVolumeUUID string
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 			// query server to check if root volume UUID has been populated
-			s, err = sc.Get(ctx, s.UUID)
+			s, err := sc.Get(ctx, s.UUID)
 			if err != nil {
 				lastErr = err
 				return false, nil

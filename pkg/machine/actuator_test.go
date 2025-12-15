@@ -201,6 +201,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		},
 	}, nil)
 
+	vs.EXPECT().Get(gomock.Any(), "root-volume-uuid").Return(&cloudscale.Volume{}, nil)
+
 	vs.EXPECT().Update(gomock.Any(), "root-volume-uuid", newDeepEqualMatcher(t, &cloudscale.VolumeRequest{
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 			Tags: ptr.To(cloudscale.TagMap(rootVolumeTags)),

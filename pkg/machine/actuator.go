@@ -187,8 +187,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		}
 
 		if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
-			reqRaw, _ := json.Marshal(req)
-			return fmt.Errorf("failed to tag root volume of machine %q: %w, req:%+v", machine.Name, err, string(reqRaw))
+			return fmt.Errorf("failed to tag root volume of machine %q: %w", machine.Name, err)
 		}
 
 		l.Info("Tagged volume", "volume", rootVolumeUUID, "machine", machine.Name, "uuid", s.UUID, "server", s)
@@ -211,7 +210,11 @@ func tagRootVolume(ctx context.Context, vc cloudscale.VolumeService, uuid string
 			Tags: ptr.To(cloudscale.TagMap(tags)),
 		},
 	}
-	return vc.Update(ctx, uuid, req)
+	if err := vc.Update(ctx, uuid, req); err != nil {
+		reqRaw, _ := json.Marshal(req)
+		return fmt.Errorf("failed to tag root volume %q: %w, req:%s", uuid, err, string(reqRaw))
+	}
+	return nil
 }
 
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {

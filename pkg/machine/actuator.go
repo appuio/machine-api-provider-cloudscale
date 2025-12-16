@@ -143,7 +143,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	// Tag the RootVolume if tags are set
 	// It can take some time for CloudScale to populate the root volume UUID
-	if spec.RootVolumeTags != nil {
+	if len(spec.RootVolumeTags) > 0 {
 		backoff := wait.Backoff{
 			Duration: 1 * time.Second,
 			Factor:   2.0,

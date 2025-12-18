@@ -1,6 +1,6 @@
 module github.com/appuio/machine-api-provider-cloudscale
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
@@ -11,11 +11,11 @@ require (
 	github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
-	k8s.io/apiserver v0.34.2
-	k8s.io/client-go v0.34.2
-	k8s.io/component-base v0.34.2
+	k8s.io/api v0.35.0
+	k8s.io/apimachinery v0.35.0
+	k8s.io/apiserver v0.35.0
+	k8s.io/client-go v0.35.0
+	k8s.io/component-base v0.35.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.22.4

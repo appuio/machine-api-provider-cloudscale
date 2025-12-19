@@ -163,6 +163,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 				lastErr = fmt.Errorf("no volumes found for server %q", s.UUID)
 				return false, nil
 			}
+			// NOTE: cloudscale currently guarantees that the first entry in the volumes array is the root volume
 			rootVolumeUUID = s.Volumes[0].UUID
 			if rootVolumeUUID == "" {
 				lastErr = fmt.Errorf("root volume UUID is empty for server %q", s.UUID)
@@ -274,6 +275,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	// 2. Update Root Volume Tags
 	if len(s.Volumes) > 0 {
+		// NOTE: cloudscale currently guarantees that the first entry in the volumes array is the root volume
 		rootVolumeUUID := s.Volumes[0].UUID
 		vc := a.volumeClientFactory(mctx.token)
 

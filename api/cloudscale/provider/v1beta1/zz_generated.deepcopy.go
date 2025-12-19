@@ -57,6 +57,13 @@ func (in *CloudscaleMachineProviderSpec) DeepCopyInto(out *CloudscaleMachineProv
 			(*out)[key] = val
 		}
 	}
+	if in.RootVolumeTags != nil {
+		in, out := &in.RootVolumeTags, &out.RootVolumeTags
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.SSHKeys != nil {
 		in, out := &in.SSHKeys, &out.SSHKeys
 		*out = make([]string, len(*in))

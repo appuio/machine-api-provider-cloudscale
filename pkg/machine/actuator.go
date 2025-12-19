@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
+	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v6"
 	"github.com/google/go-jsonnet"
@@ -14,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,6 +44,7 @@ type Actuator struct {
 
 	serverClientFactory      func(token string) cloudscale.ServerService
 	serverGroupClientFactory func(token string) cloudscale.ServerGroupService
+	volumeClientFactory      func(token string) cloudscale.VolumeService
 }
 
 // ActuatorParams holds parameter information for Actuator.
@@ -51,6 +55,7 @@ type ActuatorParams struct {
 
 	ServerClientFactory      func(token string) cloudscale.ServerService
 	ServerGroupClientFactory func(token string) cloudscale.ServerGroupService
+	VolumeClientFactory      func(token string) cloudscale.VolumeService
 }
 
 // NewActuator returns an actuator.
@@ -62,6 +67,7 @@ func NewActuator(params ActuatorParams) *Actuator {
 
 		serverClientFactory:      params.ServerClientFactory,
 		serverGroupClientFactory: params.ServerGroupClientFactory,
+		volumeClientFactory:      params.VolumeClientFactory,
 	}
 }
 
@@ -81,12 +87,8 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		return fmt.Errorf("failed to load user data secret: %w", err)
 	}
 
-	// Null is not allowed for tags in the cloudscale API
-	if spec.Tags == nil {
-		spec.Tags = make(map[string]string)
-	}
-	spec.Tags[machineNameTag] = machine.Name
-	spec.Tags[machineClusterIDTag] = mctx.clusterId
+	// prepare server tags by combining fixed and user-provided tags
+	serverTags := buildServerTags(machine.Name, mctx.clusterId, spec.Tags)
 
 	// Null is not allowed for SSH keys in the cloudscale API
 	if spec.SSHKeys == nil {
@@ -112,7 +114,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 		Name: name,
 
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
-			Tags: ptr.To(cloudscale.TagMap(spec.Tags)),
+			Tags: ptr.To(cloudscale.TagMap(serverTags)),
 		},
 		Zone: spec.Zone,
 		ZonalResourceRequest: cloudscale.ZonalResourceRequest{
@@ -136,6 +138,59 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	l.Info("Created machine", "machine", machine.Name, "uuid", s.UUID, "server", s)
 
+	// Tag the RootVolume if tags are set
+	// It can take some time for CloudScale to populate the root volume UUID
+	if len(spec.RootVolumeTags) > 0 {
+		backoff := wait.Backoff{
+			Duration: 1 * time.Second,
+			Factor:   2.0,
+			Jitter:   0.1,
+			Steps:    10,
+			Cap:      5 * time.Minute,
+		}
+		vc := a.volumeClientFactory(mctx.token)
+
+		var lastErr error
+		var rootVolumeUUID string
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			// query server to check if root volume UUID has been populated
+			s, err := sc.Get(ctx, s.UUID)
+			if err != nil {
+				lastErr = err
+				return false, nil
+			}
+			if len(s.Volumes) == 0 {
+				lastErr = fmt.Errorf("no volumes found for server %q", s.UUID)
+				return false, nil
+			}
+			// NOTE: cloudscale currently guarantees that the first entry in the volumes array is the root volume
+			rootVolumeUUID = s.Volumes[0].UUID
+			if rootVolumeUUID == "" {
+				lastErr = fmt.Errorf("root volume UUID is empty for server %q", s.UUID)
+				return false, nil
+			}
+			// ensure volume is queryable before tagging
+			if _, err := vc.Get(ctx, rootVolumeUUID); err != nil {
+				lastErr = fmt.Errorf("failed to get volume for server %q", s.UUID)
+				return false, nil
+			}
+			return true, nil
+		})
+
+		if err != nil {
+			if lastErr == nil {
+				lastErr = err
+			}
+			return fmt.Errorf("failed to get root volume UUID for machine %q: %w (last error: %v)", machine.Name, err, lastErr)
+		}
+
+		if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
+			return fmt.Errorf("failed to tag root volume of machine %q: %w", machine.Name, err)
+		}
+
+		l.Info("Tagged volume", "volume", rootVolumeUUID, "machine", machine.Name, "uuid", s.UUID, "server", s)
+	}
+
 	if err := updateMachineFromCloudscaleServer(machine, *s); err != nil {
 		return fmt.Errorf("failed to update machine %q from cloudscale API response: %w", machine.Name, err)
 	}
@@ -145,6 +200,34 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	return nil
+}
+
+func tagRootVolume(ctx context.Context, vc cloudscale.VolumeService, uuid string, tags map[string]string) error {
+	// The cloudscale API is confused by a nil map in a non-nil TagMap pointer
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
+	req := &cloudscale.VolumeRequest{
+		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+			Tags: ptr.To(cloudscale.TagMap(tags)),
+		},
+	}
+	if err := vc.Update(ctx, uuid, req); err != nil {
+		reqRaw, _ := json.Marshal(req)
+		return fmt.Errorf("failed to tag root volume %q: %w, req:%s", uuid, err, string(reqRaw))
+	}
+	return nil
+}
+
+func buildServerTags(machineName, clusterID string, userTags map[string]string) map[string]string {
+	tags := make(map[string]string)
+	maps.Copy(tags, userTags)
+	// add fixed tags
+	tags[machineNameTag] = machineName
+	tags[machineClusterIDTag] = clusterID
+
+	return tags
 }
 
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {
@@ -164,11 +247,54 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	if err != nil {
 		return fmt.Errorf("failed to get machine context: %w", err)
 	}
+	spec := mctx.spec
 	sc := a.serverClientFactory(mctx.token)
 
 	s, err := a.getServer(ctx, sc, *mctx)
 	if err != nil {
 		return fmt.Errorf("failed to get server %q: %w", machine.Name, err)
+	}
+	// getServer function returns nil if no server found
+	if s == nil {
+		return fmt.Errorf("server not found for machine %q", machine.Name)
+	}
+
+	// 1. Update Server Tags
+	serverTags := buildServerTags(machine.Name, mctx.clusterId, spec.Tags)
+	if !maps.Equal(s.Tags, serverTags) {
+		updateReq := &cloudscale.ServerUpdateRequest{
+			TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+				Tags: ptr.To(cloudscale.TagMap(serverTags)),
+			},
+		}
+
+		if err := sc.Update(ctx, s.UUID, updateReq); err != nil {
+			return fmt.Errorf("failed to update tags for machine %q (server uuid %q): %w", machine.Name, s.UUID, err)
+		}
+	}
+
+	// 2. Update Root Volume Tags
+	if len(s.Volumes) > 0 {
+		// NOTE: cloudscale currently guarantees that the first entry in the volumes array is the root volume
+		rootVolumeUUID := s.Volumes[0].UUID
+		vc := a.volumeClientFactory(mctx.token)
+
+		vol, err := vc.Get(ctx, rootVolumeUUID)
+		if err != nil {
+			return fmt.Errorf("failed to get root volume %q for machine %q: %w", rootVolumeUUID, machine.Name, err)
+		}
+		if vol == nil {
+			return fmt.Errorf("root volume %q not found for machine %q", rootVolumeUUID, machine.Name)
+		}
+
+		if !maps.Equal(vol.Tags, spec.RootVolumeTags) {
+			if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
+				return fmt.Errorf("failed to tag root volume of machine %q: %w", machine.Name, err)
+			}
+		}
+	} else {
+		// this should not happen for a running server but better to handle it
+		return fmt.Errorf("failed to tag root volume of machine %q: server has no volumes", machine.Name)
 	}
 
 	if err := updateMachineFromCloudscaleServer(machine, *s); err != nil {

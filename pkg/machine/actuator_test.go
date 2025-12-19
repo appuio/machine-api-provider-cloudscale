@@ -3,6 +3,7 @@ package machine
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http/httptest"
 	"testing"
 
@@ -61,6 +62,10 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			"foo": []byte("bar"),
 		},
 	}
+	rootVolumeTags := map[string]string{
+		"volume-purpose": "root",
+		"cluster-id":     clusterID,
+	}
 	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
 		UserDataSecret: &corev1.LocalObjectReference{Name: "app-user-data"},
 		UserDataSecretSelector: &metav1.LabelSelector{
@@ -73,6 +78,7 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 		Flavor:           "flex-16-4",
 		Image:            "custom:rhcos-4.15",
 		RootVolumeSizeGB: 100,
+		RootVolumeTags:   rootVolumeTags,
 		Interfaces: []csv1beta1.Interface{
 			{
 				Type:        csv1beta1.InterfaceTypePrivate,
@@ -119,7 +125,8 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 	c := newFakeClient(t, machine, tokenSecret, userDataSecret, appUserDataSecret, unrelatedSecret)
 	ss := csmock.NewMockServerService(ctrl)
 	sgs := csmock.NewMockServerGroupService(ctrl)
-	actuator := newActuator(c, ss, sgs)
+	vs := csmock.NewMockVolumeService(ctrl)
+	actuator := newActuator(c, ss, sgs, vs)
 
 	sgs.EXPECT().List(
 		gomock.Any(),
@@ -187,6 +194,21 @@ func Test_Actuator_Create_ComplexMachineE2E(t *testing.T) {
 			},
 		}
 	}))
+
+	ss.EXPECT().Get(gomock.Any(), "created-server-uuid").Return(&cloudscale.Server{
+		UUID: "created-server-uuid",
+		Volumes: []cloudscale.VolumeStub{
+			{UUID: "root-volume-uuid"},
+		},
+	}, nil)
+
+	vs.EXPECT().Get(gomock.Any(), "root-volume-uuid").Return(&cloudscale.Volume{}, nil)
+
+	vs.EXPECT().Update(gomock.Any(), "root-volume-uuid", newDeepEqualMatcher(t, &cloudscale.VolumeRequest{
+		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+			Tags: ptr.To(cloudscale.TagMap(rootVolumeTags)),
+		},
+	})).Return(nil)
 
 	require.NoError(t, actuator.Create(ctx, machine))
 
@@ -469,7 +491,7 @@ func Test_Actuator_Create_AntiAffinityPools(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			tc.apiMock(t, machine, providerSpec, ss, sgs)
 
@@ -557,7 +579,7 @@ func Test_Actuator_Exists(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			ss.EXPECT().List(ctx, csTagMatcher{t: t, tags: map[string]string{
 				machineNameTag: machine.Name,
@@ -571,62 +593,158 @@ func Test_Actuator_Exists(t *testing.T) {
 }
 
 func Test_Actuator_Update(t *testing.T) {
-	t.Parallel()
+	type testCase struct {
+		name string
 
-	ctx := context.Background()
+		haveServerTags   map[string]string
+		wantServerTags   map[string]string
+		wantServerUpdate bool
 
-	const clusterID = "cluster-id"
+		haveVolumeTags   map[string]string
+		wantVolumeTags   map[string]string
+		wantVolumeUpdate bool
+	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	machine := &machinev1beta1.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "app-test",
-			Labels: map[string]string{
-				machineClusterIDLabelName: clusterID,
+	tcs := []testCase{
+		{
+			name: "no changes",
+			haveServerTags: map[string]string{
+				machineNameTag:      "app-test",
+				machineClusterIDTag: "cluster-id",
+			},
+			wantServerTags: map[string]string{
+				machineNameTag:      "app-test",
+				machineClusterIDTag: "cluster-id",
+			},
+			haveVolumeTags: map[string]string{
+				"volume-purpose": "root",
+			},
+			wantVolumeTags: map[string]string{
+				"volume-purpose": "root",
 			},
 		},
-	}
-	providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
-		TokenSecret: &corev1.LocalObjectReference{Name: "cloudscale-token"},
-	}
-	setProviderSpecOnMachine(t, machine, &providerSpec)
-	tokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: providerSpec.TokenSecret.Name,
-		},
-		Data: map[string][]byte{
-			"token": []byte("my-cloudscale-token"),
-		},
-	}
-
-	c := newFakeClient(t, machine, tokenSecret)
-	ss := csmock.NewMockServerService(ctrl)
-	sgs := csmock.NewMockServerGroupService(ctrl)
-	actuator := newActuator(c, ss, sgs)
-
-	ss.EXPECT().List(ctx, csTagMatcher{
-		t: t,
-		tags: map[string]string{
-			machineNameTag: machine.Name,
-		},
-	}).Return([]cloudscale.Server{{
-		UUID: "machine-uuid",
-		TaggedResource: cloudscale.TaggedResource{
-			Tags: cloudscale.TagMap{
-				machineNameTag:      machine.Name,
-				machineClusterIDTag: clusterID,
+		{
+			name: "update server tags",
+			haveServerTags: map[string]string{
+				machineNameTag:      "app-test",
+				machineClusterIDTag: "cluster-id",
 			},
+			wantServerTags: map[string]string{
+				machineNameTag:      "app-test",
+				machineClusterIDTag: "cluster-id",
+				"new-tag":           "new-value",
+			},
+			wantServerUpdate: true,
 		},
-	}}, nil)
+		{
+			name: "update volume tags",
 
-	require.NoError(t, actuator.Update(ctx, machine))
+			haveVolumeTags: map[string]string{
+				"volume-purpose": "root",
+			},
+			wantVolumeTags: map[string]string{
+				"volume-purpose": "root",
+				"new-tag":        "new-value",
+			},
+			wantVolumeUpdate: true,
+		},
+	}
 
-	var updatedMachine machinev1beta1.Machine
-	require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(machine), &updatedMachine))
-	if assert.NotNil(t, updatedMachine.Spec.ProviderID) {
-		assert.Equal(t, "cloudscale://machine-uuid", *updatedMachine.Spec.ProviderID)
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+
+			const clusterID = "cluster-id"
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			machine := &machinev1beta1.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "app-test",
+					Labels: map[string]string{
+						machineClusterIDLabelName: clusterID,
+					},
+				},
+			}
+
+			providerSpec := csv1beta1.CloudscaleMachineProviderSpec{
+				TokenSecret:    &corev1.LocalObjectReference{Name: "cloudscale-token"},
+				RootVolumeTags: tc.wantVolumeTags,
+				Tags:           tc.wantServerTags,
+			}
+			setProviderSpecOnMachine(t, machine, &providerSpec)
+			tokenSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: providerSpec.TokenSecret.Name,
+				},
+				Data: map[string][]byte{
+					"token": []byte("my-cloudscale-token"),
+				},
+			}
+
+			c := newFakeClient(t, machine, tokenSecret)
+			ss := csmock.NewMockServerService(ctrl)
+			sgs := csmock.NewMockServerGroupService(ctrl)
+			vs := csmock.NewMockVolumeService(ctrl)
+			actuator := newActuator(c, ss, sgs, vs)
+
+			serverTagMap := func(tags map[string]string) cloudscale.TagMap {
+				tm := make(map[string]string)
+				maps.Copy(tm, tags)
+				tm[machineNameTag] = machine.Name
+				tm[machineClusterIDTag] = clusterID
+				return cloudscale.TagMap(tm)
+			}
+
+			ss.EXPECT().List(ctx, csTagMatcher{
+				t: t,
+				tags: map[string]string{
+					machineNameTag: machine.Name,
+				},
+			}).Return([]cloudscale.Server{{
+				UUID: "machine-uuid",
+				TaggedResource: cloudscale.TaggedResource{
+					Tags: serverTagMap(tc.haveServerTags),
+				},
+				Volumes: []cloudscale.VolumeStub{
+					{UUID: "root-volume-uuid"},
+				},
+			}}, nil)
+
+			if tc.wantServerUpdate {
+				ss.EXPECT().Update(gomock.Any(), "machine-uuid", newDeepEqualMatcher(t, &cloudscale.ServerUpdateRequest{
+					TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+						Tags: ptr.To(serverTagMap(tc.wantServerTags)),
+					},
+				})).Return(nil)
+			}
+
+			vs.EXPECT().Get(gomock.Any(), "root-volume-uuid").Return(&cloudscale.Volume{
+				TaggedResource: cloudscale.TaggedResource{
+					Tags: cloudscale.TagMap(tc.haveVolumeTags),
+				},
+			}, nil)
+
+			if tc.wantVolumeUpdate {
+				vs.EXPECT().Update(gomock.Any(), "root-volume-uuid", newDeepEqualMatcher(t, &cloudscale.VolumeRequest{
+					TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+						Tags: ptr.To(cloudscale.TagMap(tc.wantVolumeTags)),
+					},
+				})).Return(nil)
+			}
+
+			require.NoError(t, actuator.Update(ctx, machine))
+
+			var updatedMachine machinev1beta1.Machine
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(machine), &updatedMachine))
+			if assert.NotNil(t, updatedMachine.Spec.ProviderID) {
+				assert.Equal(t, "cloudscale://machine-uuid", *updatedMachine.Spec.ProviderID)
+			}
+
+		})
 	}
 }
 
@@ -710,7 +828,7 @@ func Test_Actuator_Delete(t *testing.T) {
 			c := newFakeClient(t, machine, tokenSecret)
 			ss := csmock.NewMockServerService(ctrl)
 			sgs := csmock.NewMockServerGroupService(ctrl)
-			actuator := newActuator(c, ss, sgs)
+			actuator := newActuator(c, ss, sgs, nil)
 
 			tc.apiMock(t, machine, ss, sgs)
 
@@ -841,7 +959,7 @@ func setProviderSpecOnMachine(t *testing.T, machine *machinev1beta1.Machine, pro
 	machine.Spec.ProviderSpec.Value = ext
 }
 
-func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.ServerGroupService) *Actuator {
+func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.ServerGroupService, vs cloudscale.VolumeService) *Actuator {
 	return NewActuator(ActuatorParams{
 		K8sClient:                 c,
 		DefaultCloudscaleAPIToken: "",
@@ -850,6 +968,9 @@ func newActuator(c client.Client, ss cloudscale.ServerService, sgs cloudscale.Se
 		},
 		ServerGroupClientFactory: func(token string) cloudscale.ServerGroupService {
 			return sgs
+		},
+		VolumeClientFactory: func(token string) cloudscale.VolumeService {
+			return vs
 		},
 	})
 }

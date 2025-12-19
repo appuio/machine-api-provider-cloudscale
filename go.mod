@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.0
+	github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.1
 	github.com/google/go-jsonnet v0.21.0
 	github.com/openshift/api v0.0.0-20251120040117-916c7003ed78
 	github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68
@@ -99,7 +99,7 @@ require (
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/oauth2 v0.33.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect

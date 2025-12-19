@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -215,11 +216,7 @@ func tagRootVolume(ctx context.Context, vc cloudscale.VolumeService, uuid string
 
 func buildServerTags(machineName, clusterID string, userTags map[string]string) map[string]string {
 	tags := make(map[string]string)
-	if userTags != nil {
-		for k, v := range userTags {
-			tags[k] = v
-		}
-	}
+	maps.Copy(tags, userTags)
 	// add fixed tags
 	tags[machineNameTag] = machineName
 	tags[machineClusterIDTag] = clusterID
@@ -258,29 +255,39 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	// 1. Update Server Tags
 	serverTags := buildServerTags(machine.Name, mctx.clusterId, spec.Tags)
-	updateReq := &cloudscale.ServerUpdateRequest{
-		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
-			Tags: ptr.To(cloudscale.TagMap(serverTags)),
-		},
-	}
+	if !maps.Equal(s.Tags, serverTags) {
+		updateReq := &cloudscale.ServerUpdateRequest{
+			TaggedResourceRequest: cloudscale.TaggedResourceRequest{
+				Tags: ptr.To(cloudscale.TagMap(serverTags)),
+			},
+		}
 
-	if err := sc.Update(ctx, s.UUID, updateReq); err != nil {
-		return fmt.Errorf("failed to update tags for machine %q (server uuid %q): %w", machine.Name, s.UUID, err)
+		if err := sc.Update(ctx, s.UUID, updateReq); err != nil {
+			return fmt.Errorf("failed to update tags for machine %q (server uuid %q): %w", machine.Name, s.UUID, err)
+		}
 	}
 
 	// 2. Update Root Volume Tags
-	if len(spec.RootVolumeTags) > 0 {
-		if len(s.Volumes) > 0 {
-			rootVolumeUUID := s.Volumes[0].UUID
-			vc := a.volumeClientFactory(mctx.token)
+	if len(s.Volumes) > 0 {
+		rootVolumeUUID := s.Volumes[0].UUID
+		vc := a.volumeClientFactory(mctx.token)
 
+		vol, err := vc.Get(ctx, rootVolumeUUID)
+		if err != nil {
+			return fmt.Errorf("failed to get root volume %q for machine %q: %w", rootVolumeUUID, machine.Name, err)
+		}
+		if vol == nil {
+			return fmt.Errorf("root volume %q not found for machine %q", rootVolumeUUID, machine.Name)
+		}
+
+		if !maps.Equal(vol.Tags, spec.RootVolumeTags) {
 			if err := tagRootVolume(ctx, vc, rootVolumeUUID, spec.RootVolumeTags); err != nil {
 				return fmt.Errorf("failed to tag root volume of machine %q: %w", machine.Name, err)
 			}
-		} else {
-			// this should not happen for a running server but better to handle it
-			return fmt.Errorf("failed to tag root volume of machine %q: server has no volumes", machine.Name)
 		}
+	} else {
+		// this should not happen for a running server but better to handle it
+		return fmt.Errorf("failed to tag root volume of machine %q: server has no volumes", machine.Name)
 	}
 
 	if err := updateMachineFromCloudscaleServer(machine, *s); err != nil {

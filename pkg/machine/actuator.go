@@ -202,6 +202,11 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 }
 
 func tagRootVolume(ctx context.Context, vc cloudscale.VolumeService, uuid string, tags map[string]string) error {
+	// The cloudscale API is confused by a nil map in a non-nil TagMap pointer
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
 	req := &cloudscale.VolumeRequest{
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 			Tags: ptr.To(cloudscale.TagMap(tags)),

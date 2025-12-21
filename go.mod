@@ -6,9 +6,9 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cloudscale-ch/cloudscale-go-sdk/v6 v6.0.1
 	github.com/google/go-jsonnet v0.21.0
-	github.com/openshift/api v0.0.0-20251120040117-916c7003ed78
+	github.com/openshift/api v0.0.0-20251205114208-5eb46a7b4ce8
 	github.com/openshift/library-go v0.0.0-20251119174848-88c26bf0df68
-	github.com/openshift/machine-api-operator v0.2.1-0.20251115003740-026e9dff6a1c
+	github.com/openshift/machine-api-operator v0.2.1-0.20251221113137-33dd26d37dd9
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	k8s.io/api v0.35.0
@@ -76,7 +76,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v1.38.3 // indirect
-	github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235 // indirect
+	github.com/openshift/client-go v0.0.0-20251202151200-fb4471581cf8 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
